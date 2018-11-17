@@ -50,167 +50,290 @@
 ****************************************************************************/
 
 import QtQuick 2.0
+import QtQuick.Controls 1.4
 import QtBluetooth 5.2
 
-Item {
-    id: top
+Rectangle {
+    color: "white"
 
-    property BluetoothService currentService
+    readonly property real maxRawPulse:                     78
+    readonly property real gainTargetPulsePercent:          0.5
+    readonly property real gainTargetPulsePercentWindow:    0.1
+    readonly property int  minGain:                         1
+    readonly property int  maxGain:                         15
+
+    property real channel0PulsePercent: 0
+    property real channel1PulsePercent: 0
+    property real channel2PulsePercent: 0
+    property real channel3PulsePercent: 0
+    property int  gain:                 15
+
+    onChannel0PulsePercentChanged: channel0PulseSlice.requestPaint()
+    onChannel1PulsePercentChanged: channel1PulseSlice.requestPaint()
+    onChannel2PulsePercentChanged: channel2PulseSlice.requestPaint()
+    onChannel3PulsePercentChanged: channel3PulseSlice.requestPaint()
+
+    Timer {
+        id:             channel0NoPulseTimer
+        running:        true
+        interval:       3000
+        onTriggered:    channel0PulsePercent = 0
+    }
+
+    Timer {
+        id:             channel1NoPulseTimer
+        running:        true
+        interval:       3000
+        onTriggered:    channel1PulsePercent = 0
+    }
+
+    Timer {
+        id:             channel2NoPulseTimer
+        running:        true
+        interval:       3000
+        onTriggered:    channel2PulsePercent = 0
+    }
+
+    Timer {
+        id:             channel3NoPulseTimer
+        running:        true
+        interval:       3000
+        onTriggered:    channel3PulsePercent = 0
+    }
+
+    Timer {
+        running:    true
+        interval:   15000
+        repeat:     true
+
+        onTriggered: {
+            // Determine max pulse strength and adjust gain
+            var maxPulsePct = Math.max(channel0PulsePercent, Math.max(channel1PulsePercent, Math.max(channel2PulsePercent, channel3PulsePercent)))
+            console.log("maxPulsePct", maxPulsePct)
+            if (maxPulsePct > gainTargetPulsePercent + gainTargetPulsePercentWindow) {
+                if (gain > minGain) {
+                    gain = gain - 1
+                    if (btSocketChannel0.connected) {
+                        btSocketChannel0.stringData = gain
+                    }
+                    if (btSocketChannel1.connected) {
+                        btSocketChannel1.stringData = gain
+                    }
+                    if (btSocketChannel2.connected) {
+                        btSocketChannel2.stringData = gain
+                    }
+                    if (btSocketChannel3.connected) {
+                        btSocketChannel3.stringData = gain
+                    }
+                }
+            } else if (maxPulsePct < gainTargetPulsePercent - gainTargetPulsePercentWindow) {
+                if (gain < maxGain) {
+                    gain = gain + 1
+                    if (btSocketChannel0.connected) {
+                        btSocketChannel0.stringData = gain
+                    }
+                    if (btSocketChannel1.connected) {
+                        btSocketChannel1.stringData = gain
+                    }
+                    if (btSocketChannel2.connected) {
+                        btSocketChannel2.stringData = gain
+                    }
+                    if (btSocketChannel3.connected) {
+                        btSocketChannel3.stringData = gain
+                    }
+                }
+            }
+        }
+    }
+
+    Text {
+        anchors.horizontalCenter:   parent.horizontalCenter
+        text:                       "Gain " + gain
+        font.pointSize:             textMeasure.font.pointSize * 2
+    }
 
     BluetoothDiscoveryModel {
-        id: btModel
-        running: true
-        discoveryMode: BluetoothDiscoveryModel.DeviceDiscovery
-        onDiscoveryModeChanged: console.log("Discovery mode: " + discoveryMode)
-        onServiceDiscovered: console.log("Found new service", service.deviceAddress, service.deviceName, service.serviceName, service.serviceUuid);
-        onDeviceDiscovered: console.log("New device: " + device)
-        onErrorChanged: {
-                switch (btModel.error) {
-                case BluetoothDiscoveryModel.PoweredOffError:
-                    console.log("Error: Bluetooth device not turned on"); break;
-                case BluetoothDiscoveryModel.InputOutputError:
-                    console.log("Error: Bluetooth I/O Error"); break;
-                case BluetoothDiscoveryModel.InvalidBluetoothAdapterError:
-                    console.log("Error: Invalid Bluetooth Adapter Error"); break;
-                case BluetoothDiscoveryModel.NoError:
-                    break;
-                default:
-                    console.log("Error: Unknown Error"); break;
+        id:             btModel
+        running:        true
+        discoveryMode:  BluetoothDiscoveryModel.FullServiceDiscovery
+
+        readonly property string _pulseServerUUID: "{94f39d29-7d6d-437d-973b-fba39e49d4ee}"
+
+        property var _deviceList: [ ]
+
+        onServiceDiscovered: {
+            var serviceName = service.serviceName
+            //console.log("Found new service", service.deviceAddress, service.deviceName, serviceName, service.serviceUuid);
+            if (service.serviceUuid == _pulseServerUUID) {
+                console.log("Found PulseServer", service.deviceAddress, service.deviceName, serviceName, service.serviceUuid);
+                for (var i=0; i<_deviceList.length; i++) {
+                    if (_deviceList[i] === service.deviceAddress) {
+                        console.log("Already connected to server")
+                        return
+                    }
                 }
+                console.log("Connecting to server")
+                var channel = parseInt(serviceName[serviceName.length - 1])
+                console.log("Found PulseServer", serviceName, channel, service.deviceAddress)
+                if (channel === 0) {
+                    btSocketChannel0.service = service
+                } else if (channel === 1) {
+                    console.log("Connecting socket 1")
+                    btSocketChannel1.service = service
+                } else if (channel === 2) {
+                    btSocketChannel2.service = service
+                } else if (channel === 3) {
+                    btSocketChannel3.service = service
+                }
+                _deviceList.push(service.deviceAddress)
+            }
         }
-   }
+
+        onErrorChanged: {
+            switch (btModel.error) {
+            case BluetoothDiscoveryModel.PoweredOffError:
+                console.log("Error: Bluetooth device not turned on"); break;
+            case BluetoothDiscoveryModel.InputOutputError:
+                console.log("Error: Bluetooth I/O Error"); break;
+            case BluetoothDiscoveryModel.InvalidBluetoothAdapterError:
+                console.log("Error: Invalid Bluetooth Adapter Error"); break;
+            case BluetoothDiscoveryModel.NoError:
+                break;
+            default:
+                console.log("Error: Unknown Error"); break;
+            }
+        }
+
+        onRunningChanged: {
+            if (!running && _deviceList.length < 4) {
+                running = true
+            }
+        }
+    }
+
+    function processStringData(channel, stringData) {
+        var split = stringData.split(" ")
+        var pulse = parseInt(split[1])
+        var temp = parseInt(split[2])
+        //console.log("Data", stringData, channel, parseInt(split[0]), pulse, temp)
+        pulse = Math.min(pulse, maxRawPulse)
+        var pulsePercent = pulse / maxRawPulse
+        if (channel === 0) {
+            channel0PulsePercent = pulsePercent
+            channel0NoPulseTimer.restart()
+        } else if (channel === 1) {
+            channel1PulsePercent = pulsePercent
+            channel1NoPulseTimer.restart()
+        } else if (channel === 2) {
+            channel2PulsePercent = pulsePercent
+            channel2NoPulseTimer.restart()
+        } else if (channel === 3) {
+            channel3PulsePercent = pulsePercent
+            channel3NoPulseTimer.restart()
+        }
+    }
+
+    BluetoothSocket {
+        id:                     btSocketChannel0
+        connected:              true
+        onStringDataChanged:    processStringData(0, stringData)
+    }
+
+    BluetoothSocket {
+        id:                     btSocketChannel1
+        connected:              true
+        onStringDataChanged:    processStringData(1, stringData)
+    }
+
+    BluetoothSocket {
+        id:                     btSocketChannel2
+        connected:              true
+        onStringDataChanged:    processStringData(2, stringData)
+    }
+
+    BluetoothSocket {
+        id:                     btSocketChannel3
+        connected:              true
+        onStringDataChanged:    processStringData(3, stringData)
+    }
+
+    Text {
+        id:         textMeasure
+        text:       "X"
+        visible:    false
+
+        property real fontPixelWidth:   contentWidth
+        property real fontPixelHeight:  contentHeight
+    }
+
+    function drawSlice(channel, ctx, centerX, centerX, radius) {
+        var startPi = [ Math.PI * 1.25, Math.PI * 1.75, Math.PI * 0.25, Math.PI * 0.75 ]
+        var stopPi = [ Math.PI * 1.75, Math.PI * 0.25, Math.PI * 0.75, Math.PI * 1.25 ]
+        ctx.beginPath();
+        ctx.fillStyle = "black";
+        ctx.strokeStyle = "white";
+        ctx.moveTo(centerX, centerX);
+        ctx.arc(centerX, centerX, radius, startPi[channel], stopPi[channel], false);
+        ctx.lineTo(centerX, centerX);
+        ctx.fill();
+        ctx.stroke()
+    }
 
     Rectangle {
-        id: busy
+        anchors.centerIn:   parent
+        width:              _diameter
+        height:             _diameter
+        radius:             _diameter / 2
+        color:              "transparent"
+        border.color:       "black"
+        border.width:       2
 
-        width: top.width * 0.7;
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: top.top;
-        height: text.height*1.2;
-        radius: 5
-        color: "#1c56f3"
-        visible: btModel.running
+        property real _diameter: Math.min(parent.width, parent.height) - (textMeasure.fontPixelHeight * 2)
+        property real _centerX: width / 2
+        property real _centerY: width / 2
 
-        Text {
-            id: text
-            text: "Scanning"
-            font.bold: true
-            font.pointSize: 20
-            anchors.centerIn: parent
-        }
+        Canvas {
+            id:             channel0PulseSlice
+            anchors.fill:   parent
 
-        SequentialAnimation on color {
-            id: busyThrobber
-            ColorAnimation { easing.type: Easing.InOutSine; from: "#1c56f3"; to: "white"; duration: 1000; }
-            ColorAnimation { easing.type: Easing.InOutSine; to: "#1c56f3"; from: "white"; duration: 1000 }
-            loops: Animation.Infinite
-        }
-    }
-
-    ListView {
-        id: mainList
-        width: top.width
-        anchors.top: busy.bottom
-        anchors.bottom: buttonGroup.top
-        anchors.bottomMargin: 10
-        anchors.topMargin: 10
-        clip: true
-
-        model: btModel
-        delegate: Rectangle {
-            id: btDelegate
-            width: parent.width
-            height: column.height + 10
-
-            property bool expended: false;
-            clip: true
-            Image {
-                id: bticon
-                source: "qrc:/default.png";
-                width: bttext.height;
-                height: bttext.height;
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.margins: 5
-            }
-
-            Column {
-                id: column
-                anchors.left: bticon.right
-                anchors.leftMargin: 5
-                Text {
-                    id: bttext
-                    text: deviceName ? deviceName : name
-                    font.family: "FreeSerif"
-                    font.pointSize: 16
-                }
-
-                Text {
-                    id: details
-                    function get_details(s) {
-                        if (btModel.discoveryMode == BluetoothDiscoveryModel.DeviceDiscovery) {
-                            //We are doing a device discovery
-                            var str = "Address: " + remoteAddress;
-                            return str;
-                        } else {
-                            var str = "Address: " + s.deviceAddress;
-                            if (s.serviceName) { str += "<br>Service: " + s.serviceName; }
-                            if (s.serviceDescription) { str += "<br>Description: " + s.serviceDescription; }
-                            if (s.serviceProtocol) { str += "<br>Protocol: " + s.serviceProtocol; }
-                            return str;
-                        }
-                    }
-                    visible: opacity !== 0
-                    opacity: btDelegate.expended ? 1 : 0.0
-                    text: get_details(service)
-                    font.family: "FreeSerif"
-                    font.pointSize: 14
-                    Behavior on opacity {
-                        NumberAnimation { duration: 200}
-                    }
-                }
-            }
-            Behavior on height { NumberAnimation { duration: 200} }
-
-            MouseArea {
-                anchors.fill: parent
-                onClicked: btDelegate.expended = !btDelegate.expended
+            onPaint: {
+                var ctx = getContext("2d");
+                ctx.reset();
+                drawSlice(0, ctx, parent._centerX, parent._centerY, parent.radius * channel0PulsePercent)
             }
         }
-        focus: true
+
+        Canvas {
+            id:             channel1PulseSlice
+            anchors.fill:   parent
+
+            onPaint: {
+                var ctx = getContext("2d");
+                ctx.reset();
+                drawSlice(1, ctx, parent._centerX, parent._centerY, parent.radius * channel1PulsePercent)
+            }
+        }
+
+        Canvas {
+            id:             channel2PulseSlice
+            anchors.fill:   parent
+
+            onPaint: {
+                var ctx = getContext("2d");
+                ctx.reset();
+                drawSlice(2, ctx, parent._centerX, parent._centerY, parent.radius * channel2PulsePercent)
+            }
+        }
+
+        Canvas {
+            id:             channel3PulseSlice
+            anchors.fill:   parent
+
+            onPaint: {
+                var ctx = getContext("2d");
+                ctx.reset();
+                drawSlice(3, ctx, parent._centerX, parent._centerY, parent.radius * channel3PulsePercent)
+            }
+        }
     }
-
-    Row {
-        id: buttonGroup
-        property var activeButton: devButton
-
-        anchors.bottom: parent.bottom
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottomMargin: 5
-        spacing: 10
-
-        Button {
-            id: fdButton
-            width: top.width/3*0.9
-            //mdButton has longest text
-            height: mdButton.height
-            text: "Full Discovery"
-            onClicked: btModel.discoveryMode = BluetoothDiscoveryModel.FullServiceDiscovery
-        }
-        Button {
-            id: mdButton
-            width: top.width/3*0.9
-            text: "Minimal Discovery"
-            onClicked: btModel.discoveryMode = BluetoothDiscoveryModel.MinimalServiceDiscovery
-        }
-        Button {
-            id: devButton
-            width: top.width/3*0.9
-            //mdButton has longest text
-            height: mdButton.height
-            text: "Device Discovery"
-            onClicked: btModel.discoveryMode = BluetoothDiscoveryModel.DeviceDiscovery
-        }
-    }
-
 }

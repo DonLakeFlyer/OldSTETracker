@@ -67,6 +67,8 @@ Rectangle {
     property real channel2PulsePercent: 0
     property real channel3PulsePercent: 0
     property int  gain:                 15
+    property var  deviceList:           [ ]
+    property var  rgSockets:            [ btSocketChannel0, btSocketChannel1, btSocketChannel2, btSocketChannel3 ]
 
     onChannel0PulsePercentChanged: channel0PulseSlice.requestPaint()
     onChannel1PulsePercentChanged: channel1PulseSlice.requestPaint()
@@ -159,33 +161,21 @@ Rectangle {
 
         readonly property string _pulseServerUUID: "{94f39d29-7d6d-437d-973b-fba39e49d4ee}"
 
-        property var _deviceList: [ ]
-
         onServiceDiscovered: {
             var serviceName = service.serviceName
             //console.log("Found new service", service.deviceAddress, service.deviceName, serviceName, service.serviceUuid);
             if (service.serviceUuid == _pulseServerUUID) {
                 console.log("Found PulseServer", service.deviceAddress, service.deviceName, serviceName, service.serviceUuid);
-                for (var i=0; i<_deviceList.length; i++) {
-                    if (_deviceList[i] === service.deviceAddress) {
-                        console.log("Already connected to server")
-                        return
-                    }
+                if (deviceList.indexOf(service.deviceAddress) != -1) {
+                    console.log("Already connected to server")
+                    return
                 }
                 console.log("Connecting to server")
                 var channel = parseInt(serviceName[serviceName.length - 1])
                 console.log("Found PulseServer", serviceName, channel, service.deviceAddress)
-                if (channel === 0) {
-                    btSocketChannel0.service = service
-                } else if (channel === 1) {
-                    console.log("Connecting socket 1")
-                    btSocketChannel1.service = service
-                } else if (channel === 2) {
-                    btSocketChannel2.service = service
-                } else if (channel === 3) {
-                    btSocketChannel3.service = service
-                }
-                _deviceList.push(service.deviceAddress)
+                console.log("rgSockets", rgSockets[channel].service)
+                rgSockets[channel].service = service
+                deviceList.push(service.deviceAddress)
             }
         }
 
@@ -205,7 +195,7 @@ Rectangle {
         }
 
         onRunningChanged: {
-            if (!running && _deviceList.length < 4) {
+            if (!running && deviceList.length < 4) {
                 running = true
             }
         }
@@ -233,10 +223,31 @@ Rectangle {
         }
     }
 
-    BluetoothSocket {
-        id:                     btSocketChannel0
-        connected:              true
-        onStringDataChanged:    processStringData(0, stringData)
+    Component {
+        id: btSocketComponent
+
+        BluetoothSocket {
+            connected:              true
+            onStringDataChanged:    processStringData(channel, stringData)
+
+            property int channel: 0
+
+            property string _deviceAddress
+
+            onServiceChanged: {
+                if (service) {
+                    deviceAddress = service.deviceAddress
+                }
+            }
+
+            onConnectedChanged: {
+                if (!connected) {
+                    console.log("Socket disconnected", deviceAddress, deviceList.indexOf(deviceAddress))
+                    var index = deviceList.indexOf(deviceAddress)
+                    deviceList = deviceList.splice(index)
+                }
+            }
+        }
     }
 
     BluetoothSocket {

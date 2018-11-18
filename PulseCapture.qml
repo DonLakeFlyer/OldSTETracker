@@ -54,7 +54,8 @@ import QtQuick.Controls 1.4
 import QtBluetooth 5.2
 
 Rectangle {
-    color: "white"
+    id:     root
+    color:  "white"
 
     readonly property real maxRawPulse:                     78
     readonly property real gainTargetPulsePercent:          0.5
@@ -68,7 +69,7 @@ Rectangle {
     property real channel3PulsePercent: 0
     property int  gain:                 15
     property var  deviceList:           [ ]
-    property var  rgSockets:            [ btSocketChannel0, btSocketChannel1, btSocketChannel2, btSocketChannel3 ]
+    property var  rgSockets:            [ null, null, null, null ]
 
     onChannel0PulsePercentChanged: channel0PulseSlice.requestPaint()
     onChannel1PulsePercentChanged: channel1PulseSlice.requestPaint()
@@ -112,46 +113,24 @@ Rectangle {
             // Determine max pulse strength and adjust gain
             var maxPulsePct = Math.max(channel0PulsePercent, Math.max(channel1PulsePercent, Math.max(channel2PulsePercent, channel3PulsePercent)))
             console.log("maxPulsePct", maxPulsePct)
+            var newGain = gain
             if (maxPulsePct > gainTargetPulsePercent + gainTargetPulsePercentWindow) {
                 if (gain > minGain) {
-                    gain = gain - 1
-                    if (btSocketChannel0.connected) {
-                        btSocketChannel0.stringData = gain
-                    }
-                    if (btSocketChannel1.connected) {
-                        btSocketChannel1.stringData = gain
-                    }
-                    if (btSocketChannel2.connected) {
-                        btSocketChannel2.stringData = gain
-                    }
-                    if (btSocketChannel3.connected) {
-                        btSocketChannel3.stringData = gain
-                    }
+                    newGain = gain - 1
                 }
             } else if (maxPulsePct < gainTargetPulsePercent - gainTargetPulsePercentWindow) {
                 if (gain < maxGain) {
-                    gain = gain + 1
-                    if (btSocketChannel0.connected) {
-                        btSocketChannel0.stringData = gain
-                    }
-                    if (btSocketChannel1.connected) {
-                        btSocketChannel1.stringData = gain
-                    }
-                    if (btSocketChannel2.connected) {
-                        btSocketChannel2.stringData = gain
-                    }
-                    if (btSocketChannel3.connected) {
-                        btSocketChannel3.stringData = gain
-                    }
+                    newGain = gain + 1
                 }
             }
+            if (newGain !== gain) {
+                rgSockets.forEach(function(socket) {
+                    if (socket) {
+                        socket.stringData = gain
+                    }
+                })
+            }
         }
-    }
-
-    Text {
-        anchors.horizontalCenter:   parent.horizontalCenter
-        text:                       "Gain " + gain
-        font.pointSize:             textMeasure.font.pointSize * 2
     }
 
     BluetoothDiscoveryModel {
@@ -163,19 +142,17 @@ Rectangle {
 
         onServiceDiscovered: {
             var serviceName = service.serviceName
-            //console.log("Found new service", service.deviceAddress, service.deviceName, serviceName, service.serviceUuid);
             if (service.serviceUuid == _pulseServerUUID) {
-                console.log("Found PulseServer", service.deviceAddress, service.deviceName, serviceName, service.serviceUuid);
-                if (deviceList.indexOf(service.deviceAddress) != -1) {
-                    console.log("Already connected to server")
-                    return
-                }
-                console.log("Connecting to server")
                 var channel = parseInt(serviceName[serviceName.length - 1])
-                console.log("Found PulseServer", serviceName, channel, service.deviceAddress)
-                console.log("rgSockets", rgSockets[channel].service)
-                rgSockets[channel].service = service
-                deviceList.push(service.deviceAddress)
+                console.log(qsTr("Found PulseServer %1 %2 %3 %4 channel(%5)").arg(service.deviceAddress).arg(service.deviceName).arg(serviceName).arg(service.serviceUuid).arg(channel));
+                if (rgSockets[channel]) {
+                    console.log("Already connected to server")
+                } else {
+                    console.log("Connecting to server")
+                    rgSockets[channel] = btSocketComponent.createObject(root, {"channel": channel, "connected": true, "service": service})
+                    channelConnectedRepeater.model = 0
+                    channelConnectedRepeater.model = 4
+                }
             }
         }
 
@@ -232,40 +209,16 @@ Rectangle {
 
             property int channel: 0
 
-            property string _deviceAddress
-
-            onServiceChanged: {
-                if (service) {
-                    deviceAddress = service.deviceAddress
-                }
-            }
-
             onConnectedChanged: {
                 if (!connected) {
-                    console.log("Socket disconnected", deviceAddress, deviceList.indexOf(deviceAddress))
-                    var index = deviceList.indexOf(deviceAddress)
-                    deviceList = deviceList.splice(index)
+                    console.log(qsTr("Socket disconnected channel(%1)".arg(channel)))
+                    rgSockets[channel] = null
+                    channelConnectedRepeater.model = 0
+                    channelConnectedRepeater.model = 4
+                    destroy()
                 }
             }
         }
-    }
-
-    BluetoothSocket {
-        id:                     btSocketChannel1
-        connected:              true
-        onStringDataChanged:    processStringData(1, stringData)
-    }
-
-    BluetoothSocket {
-        id:                     btSocketChannel2
-        connected:              true
-        onStringDataChanged:    processStringData(2, stringData)
-    }
-
-    BluetoothSocket {
-        id:                     btSocketChannel3
-        connected:              true
-        onStringDataChanged:    processStringData(3, stringData)
     }
 
     Text {
@@ -275,6 +228,25 @@ Rectangle {
 
         property real fontPixelWidth:   contentWidth
         property real fontPixelHeight:  contentHeight
+    }
+
+    Text {
+        anchors.horizontalCenter:   parent.horizontalCenter
+        text:                       "Gain " + gain
+        font.pointSize:             textMeasure.font.pointSize * 2
+    }
+
+    Column {
+        anchors.bottom: parent.bottom
+
+        Repeater {
+            id:     channelConnectedRepeater
+            model:  4
+
+            Label {
+                text: qsTr("Channel %1 - %2").arg(index).arg(rgSockets[index] ? "CONNECTED" : "not connected")
+            }
+        }
     }
 
     function drawSlice(channel, ctx, centerX, centerX, radius) {

@@ -1,4 +1,4 @@
-QT = core bluetooth quick
+QT = core bluetooth quick svg xml gui
 SOURCES += qmlscanner.cpp
 
 TARGET = qml_scanner
@@ -12,7 +12,10 @@ OTHER_FILES += \
     scanner.qml \
     default.png
 
-#DEFINES += QMLJSDEBUGGER
+android {
+    DEFINES += __android__
+    QT += androidextras
+}
 
 target.path = $$[QT_INSTALL_EXAMPLES]/bluetooth/scanner
 INSTALLS += target

@@ -3,5 +3,6 @@
         <file>scanner.qml</file>
         <file>default.png</file>
         <file>PulseCapture.qml</file>
+		<file>attitudePointer.svg</file>
     </qresource>
 </RCC>

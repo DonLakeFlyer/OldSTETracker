@@ -49,9 +49,10 @@
 **
 ****************************************************************************/
 
-import QtQuick 2.0
+import QtQuick          2.11
 import QtQuick.Controls 1.4
-import QtBluetooth 5.2
+import QtBluetooth      5.2
+import QtQuick.Window   2.11
 
 Rectangle {
     id:     root
@@ -70,6 +71,7 @@ Rectangle {
     property int  gain:                 15
     property var  deviceList:           [ ]
     property var  rgSockets:            [ null, null, null, null ]
+    property real heading:              0
 
     onChannel0PulsePercentChanged: channel0PulseSlice.requestPaint()
     onChannel1PulsePercentChanged: channel1PulseSlice.requestPaint()
@@ -124,6 +126,8 @@ Rectangle {
                 }
             }
             if (newGain !== gain) {
+                console.log("Adjusting gain", newGain)
+                gain = newGain
                 rgSockets.forEach(function(socket) {
                     if (socket) {
                         socket.stringData = gain
@@ -141,17 +145,18 @@ Rectangle {
         readonly property string _pulseServerUUID: "{94f39d29-7d6d-437d-973b-fba39e49d4ee}"
 
         onServiceDiscovered: {
-            var serviceName = service.serviceName
+            var serviceName = service.deviceName
             if (service.serviceUuid == _pulseServerUUID) {
-                var channel = parseInt(serviceName[serviceName.length - 1])
+                var channel = parseInt(serviceName.split(" ")[1])
                 console.log(qsTr("Found PulseServer %1 %2 %3 %4 channel(%5)").arg(service.deviceAddress).arg(service.deviceName).arg(serviceName).arg(service.serviceUuid).arg(channel));
-                if (rgSockets[channel]) {
-                    console.log("Already connected to server")
-                } else {
+                console.log(rgSockets[channel])
+                if (!rgSockets[channel]) {
                     console.log("Connecting to server")
                     rgSockets[channel] = btSocketComponent.createObject(root, {"channel": channel, "connected": true, "service": service})
                     channelConnectedRepeater.model = 0
                     channelConnectedRepeater.model = 4
+                } else {
+                    console.log("Already connected to server")
                 }
             }
         }
@@ -178,6 +183,43 @@ Rectangle {
         }
     }
 
+    function updateHeading() {
+        // Find strongest channel
+        var strongestChannel = -1
+        var strongestPulse = -1
+        var rgPulse = [ channel0PulsePercent, channel1PulsePercent, channel2PulsePercent, channel3PulsePercent ]
+        for (var index=0; index<rgPulse.length; index++) {
+            if (rgPulse[index] > strongestPulse) {
+                strongestChannel = index
+                strongestPulse = rgPulse[index]
+            }
+        }
+
+        // Is second strongest to the left/right heading-wise
+        var rgLeft = [ 3, 0, 1, 2 ]
+        var rgRight = [ 1, 2, 3, 0 ]
+        var rgHeading = [ 0.0, 90.0, 180.0, 270.0 ]
+        var strongLeft
+        var secondaryStrength
+        var leftPulse = rgPulse[rgLeft[strongestChannel]]
+        var rightPulse = rgPulse[rgRight[strongestChannel]]
+        if (leftPulse > rightPulse) {
+            strongLeft = true
+            heading = rgHeading[strongestChannel]
+            heading -= 45.0 * leftPulse
+        } else {
+            strongLeft = false
+            heading = rgHeading[strongestChannel]
+            heading += 45.0 * leftPulse
+        }
+
+        if (heading > 360) {
+            heading -= 360
+        } else if (heading < 0) {
+            heading += 360
+        }
+    }
+
     function processStringData(channel, stringData) {
         var split = stringData.split(" ")
         var pulse = parseInt(split[1])
@@ -198,6 +240,7 @@ Rectangle {
             channel3PulsePercent = pulsePercent
             channel3NoPulseTimer.restart()
         }
+        updateHeading()
     }
 
     Component {
@@ -231,9 +274,8 @@ Rectangle {
     }
 
     Text {
-        anchors.horizontalCenter:   parent.horizontalCenter
-        text:                       "Gain " + gain
-        font.pointSize:             textMeasure.font.pointSize * 2
+        text:           "Gain " + gain
+        font.pointSize: textMeasure.font.pointSize * 2
     }
 
     Column {
@@ -244,7 +286,7 @@ Rectangle {
             model:  4
 
             Label {
-                text: qsTr("Channel %1 - %2").arg(index).arg(rgSockets[index] ? "CONNECTED" : "not connected")
+                text: qsTr("Channel %1 - %2").arg(index).arg(rgSockets[index] ? "CONNECTED" : "not connected" )
             }
         }
     }
@@ -318,5 +360,27 @@ Rectangle {
                 drawSlice(3, ctx, parent._centerX, parent._centerY, parent.radius * channel3PulsePercent)
             }
         }
+
+        Image {
+            id:                     pointer
+            source:                 "qrc:/attitudePointer.svg"
+            mipmap:                 true
+            fillMode:               Image.PreserveAspectFit
+            anchors.leftMargin:     _pointerMargin
+            anchors.rightMargin:    _pointerMargin
+            anchors.topMargin:      _pointerMargin
+            anchors.bottomMargin:   _pointerMargin
+            anchors.fill:           parent
+            sourceSize.height:      parent.height
+
+            transform: Rotation {
+                origin.x:       pointer.width  / 2
+                origin.y:       pointer.height / 2
+                angle:          heading
+            }
+
+            readonly property real _pointerMargin: -10
+        }
+
     }
 }

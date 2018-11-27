@@ -1,58 +1,9 @@
-/****************************************************************************
-**
-** Copyright (C) 2017 The Qt Company Ltd.
-** Copyright (C) 2013 BlackBerry Limited. All rights reserved.
-** Contact: https://www.qt.io/licensing/
-**
-** This file is part of the examples of the QtBluetooth module.
-**
-** $QT_BEGIN_LICENSE:BSD$
-** Commercial License Usage
-** Licensees holding valid commercial Qt licenses may use this file in
-** accordance with the commercial license agreement provided with the
-** Software or, alternatively, in accordance with the terms contained in
-** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see https://www.qt.io/terms-conditions. For further
-** information use the contact form at https://www.qt.io/contact-us.
-**
-** BSD License Usage
-** Alternatively, you may use this file under the terms of the BSD license
-** as follows:
-**
-** "Redistribution and use in source and binary forms, with or without
-** modification, are permitted provided that the following conditions are
-** met:
-**   * Redistributions of source code must retain the above copyright
-**     notice, this list of conditions and the following disclaimer.
-**   * Redistributions in binary form must reproduce the above copyright
-**     notice, this list of conditions and the following disclaimer in
-**     the documentation and/or other materials provided with the
-**     distribution.
-**   * Neither the name of The Qt Company Ltd nor the names of its
-**     contributors may be used to endorse or promote products derived
-**     from this software without specific prior written permission.
-**
-**
-** THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-** "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-** LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-** A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-** OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-** SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-** LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-** DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-** THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-** (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
-**
-** $QT_END_LICENSE$
-**
-****************************************************************************/
-
 import QtQuick          2.11
 import QtQuick.Controls 1.4
 import QtBluetooth      5.2
 import QtQuick.Window   2.11
+import Qt.labs.settings 1.0
+import QtQuick.Layouts  1.11
 
 Rectangle {
     id:     root
@@ -72,11 +23,62 @@ Rectangle {
     property var  deviceList:           [ ]
     property var  rgSockets:            [ null, null, null, null ]
     property real heading:              0
+    property int  freqDigit1
+    property int  freqDigit2
+    property int  freqDigit3
+    property int  freqDigit4
+    property int  freqDigit5
+    property int  freqDigit6
+    property int  freqInt
+    property real fontPixelWidth:       textMeasureDefault.fontPixelWidth
+    property real fontPixelHeight:      textMeasureDefault.fontPixelHeight
+    property real fontPixelWidthLarge:  textMeasureLarge.fontPixelWidth
+    property real fontPixelHeightLarge: textMeasureLarge.fontPixelHeight
 
     onChannel0PulsePercentChanged: channel0PulseSlice.requestPaint()
     onChannel1PulsePercentChanged: channel1PulseSlice.requestPaint()
     onChannel2PulsePercentChanged: channel2PulseSlice.requestPaint()
     onChannel3PulsePercentChanged: channel3PulseSlice.requestPaint()
+
+    Component.onCompleted: {
+        console.log(settings.frequency)
+        var rgDigits = [ 0, 0, 0, 0, 0, 0 ]
+        var digitIndex = 5
+        freqInt = settings.frequency
+        while (freqInt > 0) {
+            rgDigits[digitIndex] = freqInt % 10
+            freqInt = freqInt / 10;
+            digitIndex--
+        }
+        freqDigit1 = rgDigits[0]
+        freqDigit2 = rgDigits[1]
+        freqDigit3 = rgDigits[2]
+        freqDigit4 = rgDigits[3]
+        freqDigit5 = rgDigits[4]
+        freqDigit6 = rgDigits[5]
+    }
+
+    onFreqDigit1Changed: setFrequencyFromDigits()
+    onFreqDigit2Changed: setFrequencyFromDigits()
+    onFreqDigit3Changed: setFrequencyFromDigits()
+    onFreqDigit4Changed: setFrequencyFromDigits()
+    onFreqDigit5Changed: setFrequencyFromDigits()
+    onFreqDigit6Changed: setFrequencyFromDigits()
+
+    function setFrequencyFromDigits() {
+        settings.frequency = (freqDigit1 * 100000) + (freqDigit2 * 10000) + (freqDigit3 * 1000) + (freqDigit4 * 100) + (freqDigit5 * 10) + (freqDigit6)
+        rgSockets.forEach(function(socket) {
+            if (socket) {
+                socket.stringData = "freq " + (settings.frequency * 100) + " "
+            }
+        })
+    }
+
+    Settings {
+        id: settings
+
+        property int frequency: 146000
+    }
 
     Timer {
         id:             channel0NoPulseTimer
@@ -130,7 +132,7 @@ Rectangle {
                 gain = newGain
                 rgSockets.forEach(function(socket) {
                     if (socket) {
-                        socket.stringData = gain
+                        socket.stringData = "gain " + gain + " "
                     }
                 })
             }
@@ -203,14 +205,15 @@ Rectangle {
         var secondaryStrength
         var leftPulse = rgPulse[rgLeft[strongestChannel]]
         var rightPulse = rgPulse[rgRight[strongestChannel]]
+        var strongestPulseMultipler = 100.0 / strongestPulse
         if (leftPulse > rightPulse) {
             strongLeft = true
             heading = rgHeading[strongestChannel]
-            heading -= 45.0 * leftPulse
+            heading -= 45.0 * strongestPulseMultipler * leftPulse
         } else {
             strongLeft = false
             heading = rgHeading[strongestChannel]
-            heading += 45.0 * leftPulse
+            heading += 45.0 * strongestPulseMultipler* leftPulse
         }
 
         if (heading > 360) {
@@ -261,11 +264,17 @@ Rectangle {
                     destroy()
                 }
             }
+
+            onStateChanged: {
+                if (state === Connected) {
+                    stringData = "freq " + (settings.frequency * 100) * " "
+                }
+            }
         }
     }
 
     Text {
-        id:         textMeasure
+        id:         textMeasureDefault
         text:       "X"
         visible:    false
 
@@ -274,19 +283,63 @@ Rectangle {
     }
 
     Text {
-        text:           "Gain " + gain
-        font.pointSize: textMeasure.font.pointSize * 2
+        id:             textMeasureLarge
+        text:           "X"
+        visible:        false
+        font.pointSize: textMeasureDefault.font.pointSize * 2
+
+        property real fontPixelWidth:   contentWidth
+        property real fontPixelHeight:  contentHeight
     }
 
-    Column {
-        anchors.bottom: parent.bottom
+    Component {
+        id: spinnerComponent
 
-        Repeater {
-            id:     channelConnectedRepeater
-            model:  4
+        Rectangle {
+            width:  textMeasureLarge.fontPixelWidth * 1.25
+            height: textMeasureLarge.fontPixelHeight * 2
+            color:  "black"
 
-            Label {
-                text: qsTr("Channel %1 - %2").arg(index).arg(rgSockets[index] ? "CONNECTED" : "not connected" )
+            property alias value: list.currentIndex
+
+            Text {
+                id:             textMeasureLarge
+                text:           "X"
+                visible:        false
+
+                Component.onCompleted: font.pointSize = font.pointSize * 2
+
+                property real fontPixelWidth:   contentWidth
+                property real fontPixelHeight:  contentHeight
+            }
+
+            ListView {
+                id:                         list
+                anchors.fill:               parent
+                highlightRangeMode:         ListView.StrictlyEnforceRange
+                preferredHighlightBegin:    textMeasureLarge.fontPixelHeight * 0.5
+                preferredHighlightEnd:      textMeasureLarge.fontPixelHeight * 0.5
+                clip:                       true
+                spacing:                    -textMeasureDefault.fontPixelHeight * 0.25
+                model:                      [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 ]
+
+                delegate: Text {
+                    font.pointSize:             textMeasureLarge.font.pointSize
+                    color:                      "white"
+                    text:                       index
+                    anchors.horizontalCenter:   parent.horizontalCenter
+                }
+            }
+
+            Rectangle {
+                anchors.fill: parent
+
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: "#FF000000" }
+                    GradientStop { position: 0.3; color: "#00000000" }
+                    GradientStop { position: 0.7; color: "#00000000" }
+                    GradientStop { position: 1.0; color: "#FF000000" }
+                }
             }
         }
     }
@@ -304,6 +357,96 @@ Rectangle {
         ctx.stroke()
     }
 
+    Row {
+        anchors.top:                parent.top
+        anchors.horizontalCenter:   parent.horizontalCenter
+        spacing:                    fontPixelWidth / 2
+
+        Loader {
+            id:                     loader1
+            sourceComponent:        spinnerComponent
+            Component.onCompleted:  item.value = freqDigit1
+
+
+            Connections {
+                target:         loader1.item
+                onValueChanged: freqDigit1 = loader1.item.value
+            }
+        }
+
+        Loader {
+            id:                     loader2
+            sourceComponent:        spinnerComponent
+            Component.onCompleted:  item.value = freqDigit2
+
+            property real _width: root.fontPixelWidthLarge * 1.25
+            property real _height: root.fontPixelHeightLarge * 2.75
+
+            Connections {
+                target:         loader2.item
+                onValueChanged: freqDigit2 = loader2.item.value
+            }
+        }
+
+        Loader {
+            id:                     loader3
+            sourceComponent:        spinnerComponent
+            Component.onCompleted:  item.value = freqDigit3
+
+            property real _width: root.fontPixelWidthLarge * 1.25
+            property real _height: root.fontPixelHeightLarge * 2.75
+
+            Connections {
+                target:         loader3.item
+                onValueChanged: freqDigit3 = loader3.item.value
+            }
+        }
+
+        Loader {
+            id:                     loader4
+            sourceComponent:        spinnerComponent
+            Component.onCompleted:  item.value = freqDigit4
+
+            property real _width: root.fontPixelWidthLarge * 1.25
+            property real _height: root.fontPixelHeightLarge * 2.75
+
+            Connections {
+                target:         loader4.item
+                onValueChanged: freqDigit4 = loader4.item.value
+            }
+        }
+
+        Loader {
+            id:                     loader5
+            sourceComponent:        spinnerComponent
+            Component.onCompleted:  item.value = freqDigit5
+
+            property real _width: root.fontPixelWidthLarge * 1.25
+            property real _height: root.fontPixelHeightLarge * 2.75
+
+            Connections {
+                target:         loader5.item
+                onValueChanged: freqDigit5 = loader5.item.value
+            }
+        }
+
+        Loader {
+            id:                     loader6
+            width:                  parent._width
+            height:                 parent._height
+            sourceComponent:        spinnerComponent
+            Component.onCompleted:  item.value = freqDigit6
+
+            property real _width: root.fontPixelWidthLarge * 1.25
+            property real _height: root.fontPixelHeightLarge * 2.75
+
+            Connections {
+                target:         loader6.item
+                onValueChanged: freqDigit6 = loader6.item.value
+            }
+        }
+    }
+
     Rectangle {
         anchors.centerIn:   parent
         width:              _diameter
@@ -313,9 +456,9 @@ Rectangle {
         border.color:       "black"
         border.width:       2
 
-        property real _diameter: Math.min(parent.width, parent.height) - (textMeasure.fontPixelHeight * 2)
+        property real _diameter: parent.width - (fontPixelWidth * 2)
         property real _centerX: width / 2
-        property real _centerY: width / 2
+        property real _centerY: height / 2
 
         Canvas {
             id:             channel0PulseSlice
@@ -381,6 +524,26 @@ Rectangle {
 
             readonly property real _pointerMargin: -10
         }
+    }
 
+    Text {
+        anchors.right:  parent.right
+        anchors.bottom: parent.bottom
+        text:           "Gain " + gain
+        font.pointSize: textMeasureLarge.font.pointSize
+    }
+
+    Column {
+        anchors.left:   parent.left
+        anchors.bottom: parent.bottom
+
+        Repeater {
+            id:     channelConnectedRepeater
+            model:  4
+
+            Label {
+                text: qsTr("Channel %1 - %2").arg(index).arg(rgSockets[index] ? "CONNECTED" : "not connected" )
+            }
+        }
     }
 }

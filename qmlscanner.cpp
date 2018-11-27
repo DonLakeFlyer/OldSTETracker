@@ -57,6 +57,10 @@ int main(int argc, char *argv[])
 {
     //QLoggingCategory::setFilterRules(QStringLiteral("qt.bluetooth* = true"));
     QGuiApplication application(argc, argv);
+    application.setOrganizationName("LF Software Consulting");
+    application.setOrganizationDomain("latestfiasco.com");
+    application.setApplicationName("VHF Collor Scanner");
+
     const QString mainQmlApp(QStringLiteral("qrc:/PulseCapture.qml"));
 
     QQuickView view;

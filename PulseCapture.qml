@@ -41,7 +41,6 @@ Rectangle {
     onChannel3PulsePercentChanged: channel3PulseSlice.requestPaint()
 
     Component.onCompleted: {
-        console.log(settings.frequency)
         var rgDigits = [ 0, 0, 0, 0, 0, 0 ]
         var digitIndex = 5
         freqInt = settings.frequency
@@ -292,58 +291,6 @@ Rectangle {
         property real fontPixelHeight:  contentHeight
     }
 
-    Component {
-        id: spinnerComponent
-
-        Rectangle {
-            width:  textMeasureLarge.fontPixelWidth * 1.25
-            height: textMeasureLarge.fontPixelHeight * 2
-            color:  "black"
-
-            property alias value: list.currentIndex
-
-            Text {
-                id:             textMeasureLarge
-                text:           "X"
-                visible:        false
-
-                Component.onCompleted: font.pointSize = font.pointSize * 2
-
-                property real fontPixelWidth:   contentWidth
-                property real fontPixelHeight:  contentHeight
-            }
-
-            ListView {
-                id:                         list
-                anchors.fill:               parent
-                highlightRangeMode:         ListView.StrictlyEnforceRange
-                preferredHighlightBegin:    textMeasureLarge.fontPixelHeight * 0.5
-                preferredHighlightEnd:      textMeasureLarge.fontPixelHeight * 0.5
-                clip:                       true
-                spacing:                    -textMeasureDefault.fontPixelHeight * 0.25
-                model:                      [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 ]
-
-                delegate: Text {
-                    font.pointSize:             textMeasureLarge.font.pointSize
-                    color:                      "white"
-                    text:                       index
-                    anchors.horizontalCenter:   parent.horizontalCenter
-                }
-            }
-
-            Rectangle {
-                anchors.fill: parent
-
-                gradient: Gradient {
-                    GradientStop { position: 0.0; color: "#FF000000" }
-                    GradientStop { position: 0.3; color: "#00000000" }
-                    GradientStop { position: 0.7; color: "#00000000" }
-                    GradientStop { position: 1.0; color: "#FF000000" }
-                }
-            }
-        }
-    }
-
     function drawSlice(channel, ctx, centerX, centerX, radius) {
         var startPi = [ Math.PI * 1.25, Math.PI * 1.75, Math.PI * 0.25, Math.PI * 0.75 ]
         var stopPi = [ Math.PI * 1.75, Math.PI * 0.25, Math.PI * 0.75, Math.PI * 1.25 ]
@@ -357,106 +304,51 @@ Rectangle {
         ctx.stroke()
     }
 
-    Row {
-        anchors.top:                parent.top
-        anchors.horizontalCenter:   parent.horizontalCenter
-        spacing:                    fontPixelWidth / 2
+    Column {
+        anchors.left:   parent.left
+        anchors.right:  headingIndicator.left
 
-        Loader {
-            id:                     loader1
-            sourceComponent:        spinnerComponent
-            Component.onCompleted:  item.value = freqDigit1
+        Text {
+            anchors.left:   parent.left
+            anchors.right:  parent.right
+            text:           settings.frequency
+            font.pointSize: 100
+            fontSizeMode:   Text.HorizontalFit
 
-
-            Connections {
-                target:         loader1.item
-                onValueChanged: freqDigit1 = loader1.item.value
+            MouseArea {
+                anchors.fill:   parent
+                onClicked:      freqEditor.visible = true
             }
         }
 
-        Loader {
-            id:                     loader2
-            sourceComponent:        spinnerComponent
-            Component.onCompleted:  item.value = freqDigit2
+        Text {
+            anchors.margins:    parent.width / 4
+            anchors.left:       parent.left
+            anchors.right:      parent.right
+            text:               "Gain " + gain
+            font.pointSize:     100
+            fontSizeMode:       Text.HorizontalFit
 
-            property real _width: root.fontPixelWidthLarge * 1.25
-            property real _height: root.fontPixelHeightLarge * 2.75
-
-            Connections {
-                target:         loader2.item
-                onValueChanged: freqDigit2 = loader2.item.value
-            }
-        }
-
-        Loader {
-            id:                     loader3
-            sourceComponent:        spinnerComponent
-            Component.onCompleted:  item.value = freqDigit3
-
-            property real _width: root.fontPixelWidthLarge * 1.25
-            property real _height: root.fontPixelHeightLarge * 2.75
-
-            Connections {
-                target:         loader3.item
-                onValueChanged: freqDigit3 = loader3.item.value
-            }
-        }
-
-        Loader {
-            id:                     loader4
-            sourceComponent:        spinnerComponent
-            Component.onCompleted:  item.value = freqDigit4
-
-            property real _width: root.fontPixelWidthLarge * 1.25
-            property real _height: root.fontPixelHeightLarge * 2.75
-
-            Connections {
-                target:         loader4.item
-                onValueChanged: freqDigit4 = loader4.item.value
-            }
-        }
-
-        Loader {
-            id:                     loader5
-            sourceComponent:        spinnerComponent
-            Component.onCompleted:  item.value = freqDigit5
-
-            property real _width: root.fontPixelWidthLarge * 1.25
-            property real _height: root.fontPixelHeightLarge * 2.75
-
-            Connections {
-                target:         loader5.item
-                onValueChanged: freqDigit5 = loader5.item.value
-            }
-        }
-
-        Loader {
-            id:                     loader6
-            width:                  parent._width
-            height:                 parent._height
-            sourceComponent:        spinnerComponent
-            Component.onCompleted:  item.value = freqDigit6
-
-            property real _width: root.fontPixelWidthLarge * 1.25
-            property real _height: root.fontPixelHeightLarge * 2.75
-
-            Connections {
-                target:         loader6.item
-                onValueChanged: freqDigit6 = loader6.item.value
+            MouseArea {
+                anchors.fill:   parent
+                onClicked:      console.log("Gain")
             }
         }
     }
 
+    // Heading Indicator
     Rectangle {
-        anchors.centerIn:   parent
-        width:              _diameter
-        height:             _diameter
-        radius:             _diameter / 2
+        id:                 headingIndicator
+        anchors.margins:    fontPixelWidth
+        anchors.right:      parent.right
+        anchors.top:        parent.top
+        anchors.bottom:     parent.bottom
+        width:              height
+        radius:             height / 2
         color:              "transparent"
         border.color:       "black"
         border.width:       2
 
-        property real _diameter: parent.width - (fontPixelWidth * 2)
         property real _centerX: width / 2
         property real _centerY: height / 2
 
@@ -526,13 +418,6 @@ Rectangle {
         }
     }
 
-    Text {
-        anchors.right:  parent.right
-        anchors.bottom: parent.bottom
-        text:           "Gain " + gain
-        font.pointSize: textMeasureLarge.font.pointSize
-    }
-
     Column {
         anchors.left:   parent.left
         anchors.bottom: parent.bottom
@@ -543,6 +428,140 @@ Rectangle {
 
             Label {
                 text: qsTr("Channel %1 - %2").arg(index).arg(rgSockets[index] ? "CONNECTED" : "not connected" )
+            }
+        }
+    }
+
+    Component {
+        id: spinnerComponent
+
+        Rectangle {
+            width:  textMeasureLarge.fontPixelWidth * 1.25
+            height: textMeasureLarge.fontPixelHeight * 2
+            color:  "black"
+
+            property alias value: list.currentIndex
+
+            Text {
+                id:             textMeasureLarge
+                text:           "X"
+                font.pointSize: 72
+                visible:        false
+
+                property real fontPixelWidth:   contentWidth
+                property real fontPixelHeight:  contentHeight
+            }
+
+            ListView {
+                id:                         list
+                anchors.fill:               parent
+                highlightRangeMode:         ListView.StrictlyEnforceRange
+                preferredHighlightBegin:    textMeasureLarge.fontPixelHeight * 0.5
+                preferredHighlightEnd:      textMeasureLarge.fontPixelHeight * 0.5
+                clip:                       true
+                spacing:                    -textMeasureDefault.fontPixelHeight * 0.25
+                model:                      [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 ]
+
+                delegate: Text {
+                    font.pointSize:             textMeasureLarge.font.pointSize
+                    color:                      "white"
+                    text:                       index
+                    anchors.horizontalCenter:   parent.horizontalCenter
+                }
+            }
+
+            Rectangle {
+                anchors.fill: parent
+
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: "#FF000000" }
+                    GradientStop { position: 0.3; color: "#00000000" }
+                    GradientStop { position: 0.7; color: "#00000000" }
+                    GradientStop { position: 1.0; color: "#FF000000" }
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        id:             freqEditor
+        anchors.fill:   parent
+        visible:        false
+
+        Button {
+            anchors.right:  parent.right
+            text:           "Close"
+            onClicked:      freqEditor.visible = false
+        }
+
+        Row {
+            anchors.centerIn:   parent
+            spacing:            fontPixelWidth / 2
+
+            Loader {
+                id:                     loader1
+                sourceComponent:        spinnerComponent
+                Component.onCompleted:  item.value = freqDigit1
+
+                Connections {
+                    target:         loader1.item
+                    onValueChanged: freqDigit1 = loader1.item.value
+                }
+            }
+
+            Loader {
+                id:                     loader2
+                sourceComponent:        spinnerComponent
+                Component.onCompleted:  item.value = freqDigit2
+
+                Connections {
+                    target:         loader2.item
+                    onValueChanged: freqDigit2 = loader2.item.value
+                }
+            }
+
+            Loader {
+                id:                     loader3
+                sourceComponent:        spinnerComponent
+                Component.onCompleted:  item.value = freqDigit3
+
+                Connections {
+                    target:         loader3.item
+                    onValueChanged: freqDigit3 = loader3.item.value
+                }
+            }
+
+            Loader {
+                id:                     loader4
+                sourceComponent:        spinnerComponent
+                Component.onCompleted:  item.value = freqDigit4
+
+                Connections {
+                    target:         loader4.item
+                    onValueChanged: freqDigit4 = loader4.item.value
+                }
+            }
+
+            Loader {
+                id:                     loader5
+                sourceComponent:        spinnerComponent
+                Component.onCompleted:  item.value = freqDigit5
+
+                Connections {
+                    target:         loader5.item
+                    onValueChanged: freqDigit5 = loader5.item.value
+                }
+            }
+
+            Loader {
+                id:                     loader6
+                sourceComponent:        spinnerComponent
+                Component.onCompleted:  item.value = freqDigit6
+
+                Connections {
+                    target:         loader6.item
+                    onValueChanged: freqDigit6 = loader6.item.value
+                }
             }
         }
     }

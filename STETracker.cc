@@ -52,6 +52,11 @@
 #include <QtQuick/QQuickView>
 #include <QtQml/QQmlEngine>
 #include <QtCore/QLoggingCategory>
+#include <QQmlApplicationEngine>
+#include <QQmlContext>
+
+#include "UDPLink.h"
+#include "Pulse.h"
 
 int main(int argc, char *argv[])
 {
@@ -61,17 +66,27 @@ int main(int argc, char *argv[])
     application.setOrganizationDomain("latestfiasco.com");
     application.setApplicationName("VHF Collor Scanner");
 
+    UDPLink udpLink;
+    Pulse pulse;
+
+    udpLink.connect(&udpLink,   &UDPLink::pulse,        &pulse,     &Pulse::pulse);
+    pulse.connect(&pulse,       &Pulse::setGainSignal,  &udpLink,   &UDPLink::setGain);
+    pulse.connect(&pulse,       &Pulse::setFreqSignal,  &udpLink,   &UDPLink::setFreq);
+
+    QQmlApplicationEngine engine;
+    engine.rootContext()->setContextProperty("pulse", &pulse);
+
     const QString mainQmlApp(QStringLiteral("qrc:/PulseCapture.qml"));
 
+#if 0
     QQuickView view;
     view.setSource(QUrl(mainQmlApp));
     view.setResizeMode(QQuickView::SizeRootObjectToView);
+#endif
 
-    // Qt.quit() called in embedded .qml by default only emits
-    // quit() signal, so do this (optionally use Qt.exit()).
-    QObject::connect(view.engine(), SIGNAL(quit()), qApp, SLOT(quit()));
-    view.setGeometry(QRect(100, 100, 640, 360));
-    view.show();
+    engine.load(mainQmlApp);
+    if (engine.rootObjects().isEmpty())
+        return -1;
 
     return application.exec();
 }

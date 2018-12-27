@@ -1,17 +1,22 @@
 QT = core bluetooth quick svg xml gui
 
-SOURCES += \
-    qmlscanner.cpp
+HEADERS += \
+    UDPLink.h \
+    Pulse.h \
 
-TARGET = qml_scanner
+SOURCES += \
+    STETracker.cc \
+    UDPLink.cc \
+    Pulse.cc \
+
+TARGET = STETracker
 TEMPLATE = app
 
 RESOURCES += \
-    scanner.qrc
+    STETracker.qrc
 
 OTHER_FILES += \
     PulseCapture.qml \
-    scanner.qml \
     default.png
 
 android {

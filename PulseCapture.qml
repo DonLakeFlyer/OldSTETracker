@@ -1,9 +1,10 @@
-import QtQuick          2.11
-import QtQuick.Controls 1.4
-import QtBluetooth      5.2
-import QtQuick.Window   2.11
-import Qt.labs.settings 1.0
-import QtQuick.Layouts  1.11
+import QtQuick                  2.11
+import QtQuick.Controls         1.4
+import QtBluetooth              5.2
+import QtQuick.Window           2.11
+import Qt.labs.settings         1.0
+import QtQuick.Layouts          1.11
+import QtQuick.Controls.Styles  1.4
 
 Window {
     id:     root
@@ -22,6 +23,7 @@ Window {
     readonly property int  maxGain:                         15
     readonly property int  channelTimeoutMSecs:             10000
 
+    property bool autoGain: true
     property int  gain:     15
     property real heading:  0
 
@@ -244,7 +246,6 @@ Window {
         }
     }
 
-
     function updateHeading() {
         // Find strongest channel
         var strongestChannel = -1
@@ -304,6 +305,16 @@ Window {
         property real fontPixelHeight:  contentHeight
     }
 
+    Text {
+        id:             textMeasureExtraLarge
+        text:           "X"
+        font.pointSize: 72
+        visible:        false
+
+        property real fontPixelWidth:   contentWidth
+        property real fontPixelHeight:  contentHeight
+    }
+
     function drawSlice(channel, ctx, centerX, centerX, radius) {
         var startPi = [ Math.PI * 1.25, Math.PI * 1.75, Math.PI * 0.25, Math.PI * 0.75 ]
         var stopPi = [ Math.PI * 1.75, Math.PI * 0.25, Math.PI * 0.75, Math.PI * 1.25 ]
@@ -335,12 +346,16 @@ Window {
         }
 
         Text {
-            anchors.margins:    parent.width / 4
             anchors.left:       parent.left
             anchors.right:      parent.right
-            text:               "Gain " + gain
+            text:               (autoGain ? "Auto" : "Manual") + " Gain " + gain
             font.pointSize:     100
             fontSizeMode:       Text.HorizontalFit
+
+            MouseArea {
+                anchors.fill:   parent
+                onClicked:      gainEditor.visible = true
+            }
         }
     }
 
@@ -498,37 +513,27 @@ Window {
     }
 
     Component {
-        id: spinnerComponent
+        id: digitSpinnerComponent
 
         Rectangle {
-            width:  textMeasureLarge.fontPixelWidth * 1.25
-            height: textMeasureLarge.fontPixelHeight * 2
+            width:  textMeasureExtraLarge.fontPixelWidth * 1.25
+            height: textMeasureExtraLarge.fontPixelHeight * 2
             color:  "black"
 
             property alias value: list.currentIndex
-
-            Text {
-                id:             textMeasureLarge
-                text:           "X"
-                font.pointSize: 72
-                visible:        false
-
-                property real fontPixelWidth:   contentWidth
-                property real fontPixelHeight:  contentHeight
-            }
 
             ListView {
                 id:                         list
                 anchors.fill:               parent
                 highlightRangeMode:         ListView.StrictlyEnforceRange
-                preferredHighlightBegin:    textMeasureLarge.fontPixelHeight * 0.5
-                preferredHighlightEnd:      textMeasureLarge.fontPixelHeight * 0.5
+                preferredHighlightBegin:    textMeasureExtraLarge.fontPixelHeight * 0.5
+                preferredHighlightEnd:      textMeasureExtraLarge.fontPixelHeight * 0.5
                 clip:                       true
                 spacing:                    -textMeasureDefault.fontPixelHeight * 0.25
                 model:                      [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 ]
 
                 delegate: Text {
-                    font.pointSize:             textMeasureLarge.font.pointSize
+                    font.pointSize:             textMeasureExtraLarge.font.pointSize
                     color:                      "white"
                     text:                       index
                     anchors.horizontalCenter:   parent.horizontalCenter
@@ -565,7 +570,7 @@ Window {
 
             Loader {
                 id:                     loader1
-                sourceComponent:        spinnerComponent
+                sourceComponent:        digitSpinnerComponent
                 Component.onCompleted:  item.value = freqDigit1
 
                 Connections {
@@ -576,7 +581,7 @@ Window {
 
             Loader {
                 id:                     loader2
-                sourceComponent:        spinnerComponent
+                sourceComponent:        digitSpinnerComponent
                 Component.onCompleted:  item.value = freqDigit2
 
                 Connections {
@@ -587,7 +592,7 @@ Window {
 
             Loader {
                 id:                     loader3
-                sourceComponent:        spinnerComponent
+                sourceComponent:        digitSpinnerComponent
                 Component.onCompleted:  item.value = freqDigit3
 
                 Connections {
@@ -598,7 +603,7 @@ Window {
 
             Loader {
                 id:                     loader4
-                sourceComponent:        spinnerComponent
+                sourceComponent:        digitSpinnerComponent
                 Component.onCompleted:  item.value = freqDigit4
 
                 Connections {
@@ -609,7 +614,7 @@ Window {
 
             Loader {
                 id:                     loader5
-                sourceComponent:        spinnerComponent
+                sourceComponent:        digitSpinnerComponent
                 Component.onCompleted:  item.value = freqDigit5
 
                 Connections {
@@ -620,12 +625,82 @@ Window {
 
             Loader {
                 id:                     loader6
-                sourceComponent:        spinnerComponent
+                sourceComponent:        digitSpinnerComponent
                 Component.onCompleted:  item.value = freqDigit6
 
                 Connections {
                     target:         loader6.item
                     onValueChanged: freqDigit6 = loader6.item.value
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        id:             gainEditor
+        anchors.fill:   parent
+        visible:        false
+
+        CheckBox {
+            id:         autoGainCheckbox
+            text:       "Auto-Gain"
+            checked:    autoGain
+
+            style: CheckBoxStyle {
+                id: checkboxStyle
+                label: Label {
+                    text:           checkboxStyle.control.text
+                    font.pointSize: textMeasureLarge.font.pointSize
+                }
+            }
+
+            onClicked:  autoGain = checked
+        }
+
+        Button {
+            anchors.right:  parent.right
+            text:           "Close"
+            onClicked:      gainEditor.visible = false
+        }
+
+        Rectangle {
+            anchors.centerIn:   parent
+            width:              textMeasureExtraLarge.fontPixelWidth * 2.25
+            height:             textMeasureExtraLarge.fontPixelHeight * 2
+            color:              "black"
+            enabled:            !autoGainCheckbox.checked
+
+            property alias value: list.currentIndex
+
+            ListView {
+                id:                         list
+                anchors.fill:               parent
+                highlightRangeMode:         ListView.StrictlyEnforceRange
+                preferredHighlightBegin:    textMeasureExtraLarge.fontPixelHeight * 0.5
+                preferredHighlightEnd:      textMeasureExtraLarge.fontPixelHeight * 0.5
+                clip:                       true
+                spacing:                    -textMeasureDefault.fontPixelHeight * 0.25
+                currentIndex:               gain
+                model:                      [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 ]
+
+                delegate: Text {
+                    font.pointSize:             textMeasureExtraLarge.font.pointSize
+                    color:                      "white"
+                    text:                       index
+                    anchors.horizontalCenter:   parent.horizontalCenter
+                }
+
+                onCurrentIndexChanged: gain = currentIndex
+            }
+
+            Rectangle {
+                anchors.fill: parent
+
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: "#FF000000" }
+                    GradientStop { position: 0.3; color: "#00000000" }
+                    GradientStop { position: 0.7; color: "#00000000" }
+                    GradientStop { position: 1.0; color: "#FF000000" }
                 }
             }
         }

@@ -16,15 +16,20 @@ Window {
 
     readonly property real maxRawPulse:                     20
     readonly property real minRawPulse:                     0.0001
-    readonly property real log10PulseRange:                 pulse.log10(maxRawPulse) - pulse.log10(minRawPulse)
+    //readonly property real log10PulseRange:                 pulse.log10(maxRawPulse) - pulse.log10(minRawPulse)
+    readonly property real pulseRange:                      maxRawPulse - minRawPulse
     readonly property real gainTargetPulsePercent:          0.5
     readonly property real gainTargetPulsePercentWindow:    0.1
     readonly property int  minGain:                         1
     readonly property int  maxGain:                         15
     readonly property int  channelTimeoutMSecs:             10000
+    readonly property var   dbRadiationPct:                 [ 1.0,  .97,    .94,    .85,    .63,    .40,    .10,    .20,    .30,    .40,    .45,    0.5,    0.51 ]
+    readonly property real  dbRadiationMinPulse:            maxRawPulse * 0.25
+    readonly property var   dbRadiationAngle:               [ 0,    15,     30,     45,     60,     75,     90,     105,    120,    135,    150,    165,    180 ]
+    readonly property real  dbRadiationAngleInc:            15
 
     property bool autoGain: true
-    property int  gain:     15
+    property int  gain:     21
     property real heading:  0
 
     property bool channel0FirstFreqSent: false
@@ -104,60 +109,120 @@ Window {
         pulse.setFreq(settings.frequency * 1000)
     }
 
+    function _handlePulse(channelIndex, cpuTemp, pulseValue) {
+        //console.log("Pulse", channelIndex, cpuTemp.toFixed(0), pulseValue.toFixed(5), pulse.log10(pulseValue))
+        //console.log("log pulse %", (pulse.log10(pulseValue) - pulse.log10(minRawPulse)) / log10PulseRange)
+        var pulsePercent
+        if (pulseValue == 0) {
+            pulsePercent = 0
+        } else {
+            //pulsePercent = (pulse.log10(pulseValue) - pulse.log10(minRawPulse)) / log10PulseRange
+            pulsePercent = (pulseValue - minRawPulse) / pulseRange
+        }
+        if (channelIndex === 0) {
+            channel0Active = true
+            channel0PulseValue = pulseValue
+            channel0PulsePercent = pulsePercent
+            channel0CPUTemp = cpuTemp
+            channel0NoPulseTimer.restart()
+            if (!channel0FirstFreqSent) {
+                channel0FirstFreqSent = true
+                setFrequencyFromDigits()
+            }
+        } else if (channelIndex === 1) {
+            channel1Active = true
+            channel1PulseValue = pulseValue
+            channel1PulsePercent = pulsePercent
+            channel1CPUTemp = cpuTemp
+            channel1NoPulseTimer.restart()
+            if (!channel1FirstFreqSent) {
+                channel1FirstFreqSent = true
+                setFrequencyFromDigits()
+            }
+        } else if (channelIndex === 2) {
+            channel2Active = true
+            channel2PulseValue = pulseValue
+            channel2PulsePercent = pulsePercent
+            channel2CPUTemp = cpuTemp
+            channel2NoPulseTimer.restart()
+            if (!channel2FirstFreqSent) {
+                channel2FirstFreqSent = true
+                setFrequencyFromDigits()
+            }
+        } else if (channelIndex === 3) {
+            channel3Active = true
+            channel3PulseValue = pulseValue
+            channel3PulsePercent = pulsePercent
+            channel3CPUTemp = cpuTemp
+            channel3NoPulseTimer.restart()
+            if (!channel3FirstFreqSent) {
+                channel3FirstFreqSent = true
+                setFrequencyFromDigits()
+            }
+        }
+        updateHeading()
+    }
+
     Connections {
         target: pulse
 
-        onPulse: {
-            //console.log("Pulse", channelIndex, cpuTemp.toFixed(0), pulseValue.toFixed(5), pulse.log10(pulseValue))
-            //console.log("log pulse %", (pulse.log10(pulseValue) - pulse.log10(minRawPulse)) / log10PulseRange)
-            var pulsePercent
-            if (pulseValue == 0) {
-                pulsePercent = 0
+        onPulse: _handlePulse(channelIndex, cpuTemp, pulseValue)
+    }
+
+    Timer {
+        id:             pulseSimulator
+        running:        true
+        interval:       2000
+        repeat:         true
+
+        property real heading:          0
+        property real headingIncrement: 5
+
+        onTriggered: pulseSimulator.nextHeading()
+
+        function generatePulse(channel, heading) {
+            console.log("original", heading)
+            if ( heading > 180) {
+                heading = 180 - (heading - 180)
+            }
+
+            var radiationIndex
+            if (heading == 0) {
+                radiationIndex = 1
             } else {
-                pulsePercent = (pulse.log10(pulseValue) - pulse.log10(minRawPulse)) / log10PulseRange
+                radiationIndex = Math.ceil(heading / dbRadiationAngleInc)
             }
-            if (channelIndex === 0) {
-                channel0Active = true
-                channel0PulseValue = pulseValue
-                channel0PulsePercent = pulsePercent
-                channel0CPUTemp = cpuTemp
-                channel0NoPulseTimer.restart()
-                if (!channel0FirstFreqSent) {
-                    channel0FirstFreqSent = true
-                    setFrequencyFromDigits()
-                }
-            } else if (channelIndex === 1) {
-                channel1Active = true
-                channel1PulseValue = pulseValue
-                channel1PulsePercent = pulsePercent
-                channel1CPUTemp = cpuTemp
-                channel1NoPulseTimer.restart()
-                if (!channel1FirstFreqSent) {
-                    channel1FirstFreqSent = true
-                    setFrequencyFromDigits()
-                }
-            } else if (channelIndex === 2) {
-                channel2Active = true
-                channel2PulseValue = pulseValue
-                channel2PulsePercent = pulsePercent
-                channel2CPUTemp = cpuTemp
-                channel2NoPulseTimer.restart()
-                if (!channel2FirstFreqSent) {
-                    channel2FirstFreqSent = true
-                    setFrequencyFromDigits()
-                }
-            } else if (channelIndex === 3) {
-                channel3Active = true
-                channel3PulseValue = pulseValue
-                channel3PulsePercent = pulsePercent
-                channel3CPUTemp = cpuTemp
-                channel3NoPulseTimer.restart()
-                if (!channel3FirstFreqSent) {
-                    channel3FirstFreqSent = true
-                    setFrequencyFromDigits()
-                }
+
+            var powerLow = dbRadiationPct[radiationIndex-1]
+            var powerHigh = dbRadiationPct[radiationIndex]
+            var powerRange = powerHigh - powerLow
+            var slicePct = (heading - ((radiationIndex - 1) * dbRadiationAngleInc)) / dbRadiationAngleInc
+            var powerHeading = powerLow + (powerRange * slicePct)
+
+            //console.log(qsTr("heading(%1) radiationIndex(%2) powerLow(%3) powerHigh(%4) powerRange(%5) slicePct(%6) powerHeading(%7)").arg(heading).arg(radiationIndex).arg(powerLow).arg(powerHigh).arg(powerRange).arg(slicePct).arg(powerHeading))
+
+            var pulseValue = dbRadiationMinPulse + ((maxRawPulse - dbRadiationMinPulse) * powerHeading)
+            console.log("heading:pulse", heading, pulseValue)
+
+            _handlePulse(channel, 0, pulseValue)
+        }
+
+        function normalizeHeading(heading) {
+            if (heading >= 360.0) {
+                heading = heading - 360.0
+            } else if (heading < 0) {
+                heading = heading + 360
             }
-            updateHeading()
+            return heading
+        }
+
+        function nextHeading() {
+            pulseSimulator.heading = pulseSimulator.normalizeHeading(pulseSimulator.heading + pulseSimulator.headingIncrement)
+            console.log("Simulated Heading", heading)
+            pulseSimulator.generatePulse(0, pulseSimulator.heading)
+            pulseSimulator.generatePulse(1, pulseSimulator.normalizeHeading(pulseSimulator.heading - 90))
+            pulseSimulator.generatePulse(2, pulseSimulator.normalizeHeading(pulseSimulator.heading - 180))
+            pulseSimulator.generatePulse(3, pulseSimulator.normalizeHeading(pulseSimulator.heading - 270))
         }
     }
 
@@ -226,6 +291,10 @@ Window {
         repeat:     true
 
         onTriggered: {
+            if (!autoGain) {
+                return
+            }
+
             var maxPulsePct = Math.max(channel0PulsePercent, Math.max(channel1PulsePercent, Math.max(channel2PulsePercent, channel3PulsePercent)))
             //console.log("maxPulsePct", maxPulsePct)
             var newGain = gain
@@ -258,7 +327,6 @@ Window {
             }
         }
 
-        // Is second strongest to the left/right heading-wise
         var rgLeft = [ 3, 0, 1, 2 ]
         var rgRight = [ 1, 2, 3, 0 ]
         var rgHeading = [ 0.0, 90.0, 180.0, 270.0 ]
@@ -266,7 +334,20 @@ Window {
         var secondaryStrength
         var leftPulse = rgPulse[rgLeft[strongestChannel]]
         var rightPulse = rgPulse[rgRight[strongestChannel]]
-        var strongestPulseMultipler = 100.0 / strongestPulsePct
+
+        var headingAdjust
+        if (rightPulse > leftPulse) {
+            headingAdjust = (1 - (leftPulse / rightPulse)) / 0.5
+            heading = rgHeading[strongestChannel] + (45.0 * headingAdjust)
+        } else {
+            headingAdjust = (1 - (rightPulse / leftPulse)) / 0.5
+            heading = rgHeading[strongestChannel] - (45.0 * headingAdjust)
+        }
+        //console.log(qsTr("rightPulse(%1) leftPulse(%2) headingAdjust(%3)").arg(rightPulse).arg(leftPulse).arg(headingAdjust))
+
+        //var strongestPulseMultipler = 100.0 / strongestPulsePct
+
+        /*
         if (leftPulse > rightPulse) {
             //console.log("updateHeading", strongestChannel, "left")
             strongLeft = true
@@ -277,13 +358,14 @@ Window {
             strongLeft = false
             heading = rgHeading[strongestChannel]
             heading += 45.0 * strongestPulsePct * rightPulse
-        }
+        }*/
 
         if (heading > 360) {
             heading -= 360
         } else if (heading < 0) {
             heading += 360
         }
+        console.log("Estimated Heading:", heading)
     }
 
     Text {
@@ -690,7 +772,10 @@ Window {
                     anchors.horizontalCenter:   parent.horizontalCenter
                 }
 
-                onCurrentIndexChanged: gain = currentIndex
+                onCurrentIndexChanged: {
+                    gain = currentIndex
+                    pulse.setGain(gain)
+                }
             }
 
             Rectangle {

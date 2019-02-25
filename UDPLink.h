@@ -38,7 +38,7 @@ public:
     void    run                     ();
 
 signals:
-    void pulse(int channelIndex, float cpuTemp, float pulseValue);
+    void pulse(int channelIndex, float cpuTemp, float pulseValue, int gain);
 
 public slots:
     void setGain(int gain);

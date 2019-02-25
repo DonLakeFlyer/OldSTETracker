@@ -14,11 +14,6 @@ Pulse::~Pulse()
 
 }
 
-void Pulse::emitPulse(int channelIndex, float cpuTemp, float pulseValue)
-{
-    emit pulse(channelIndex, cpuTemp, pulseValue);
-}
-
 void Pulse::setFreq(int freq)
 {
     //qDebug() << "Pulse::setFreq" << freq;

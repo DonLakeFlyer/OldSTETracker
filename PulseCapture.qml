@@ -57,6 +57,11 @@ Window {
     property real channel2PulsePercent: 0
     property real channel3PulsePercent: 0
 
+    property int channel0Gain:   0
+    property int channel1Gain:   0
+    property int channel2Gain:   0
+    property int channel3Gain:   0
+
     property int  freqDigit1
     property int  freqDigit2
     property int  freqDigit3
@@ -109,7 +114,7 @@ Window {
         pulse.setFreq(settings.frequency * 1000)
     }
 
-    function _handlePulse(channelIndex, cpuTemp, pulseValue) {
+    function _handlePulse(channelIndex, cpuTemp, pulseValue, gain) {
         //console.log("Pulse", channelIndex, cpuTemp.toFixed(0), pulseValue.toFixed(5), pulse.log10(pulseValue))
         //console.log("log pulse %", (pulse.log10(pulseValue) - pulse.log10(minRawPulse)) / log10PulseRange)
         var pulsePercent
@@ -124,6 +129,7 @@ Window {
             channel0PulseValue = pulseValue
             channel0PulsePercent = pulsePercent
             channel0CPUTemp = cpuTemp
+            channel0Gain = gain
             channel0NoPulseTimer.restart()
             if (!channel0FirstFreqSent) {
                 channel0FirstFreqSent = true
@@ -134,6 +140,7 @@ Window {
             channel1PulseValue = pulseValue
             channel1PulsePercent = pulsePercent
             channel1CPUTemp = cpuTemp
+            channel1Gain = gain
             channel1NoPulseTimer.restart()
             if (!channel1FirstFreqSent) {
                 channel1FirstFreqSent = true
@@ -144,6 +151,7 @@ Window {
             channel2PulseValue = pulseValue
             channel2PulsePercent = pulsePercent
             channel2CPUTemp = cpuTemp
+            channel2Gain = gain
             channel2NoPulseTimer.restart()
             if (!channel2FirstFreqSent) {
                 channel2FirstFreqSent = true
@@ -154,6 +162,7 @@ Window {
             channel3PulseValue = pulseValue
             channel3PulsePercent = pulsePercent
             channel3CPUTemp = cpuTemp
+            channel3Gain = gain
             channel3NoPulseTimer.restart()
             if (!channel3FirstFreqSent) {
                 channel3FirstFreqSent = true
@@ -166,7 +175,7 @@ Window {
     Connections {
         target: pulse
 
-        onPulse: _handlePulse(channelIndex, cpuTemp, pulseValue)
+        onPulse: _handlePulse(channelIndex, cpuTemp, pulseValue, gain)
     }
 
     Timer {
@@ -543,7 +552,7 @@ Window {
 
             Label { id: label0; text: "Channel 0" }
         }
-        Label { text: channel0Active ? (qsTr("%1 %2 %3").arg(channel0PulseValue.toFixed(6)).arg(channel0PulsePercent.toFixed(2)).arg(channel0CPUTemp)) : "DISCONNECTED" }
+        Label { text: channel0Active ? (qsTr("%1 %2% %3c %4g").arg(channel0PulseValue.toFixed(6)).arg(channel0PulsePercent.toFixed(2)).arg(channel0CPUTemp).arg(channel0Gain)) : "DISCONNECTED" }
 
         Rectangle {
             id:     channel1Background
@@ -559,7 +568,7 @@ Window {
 
             Label { id: label1; text: "Channel 1" }
         }
-        Label { text: channel1Active ? (qsTr("%1 %2 %3").arg(channel1PulseValue.toFixed(6)).arg(channel1PulsePercent.toFixed(2)).arg(channel1CPUTemp)) : "DISCONNECTED" }
+        Label { text: channel1Active ? (qsTr("%1 %2% %3c %4g").arg(channel1PulseValue.toFixed(6)).arg(channel1PulsePercent.toFixed(2)).arg(channel1CPUTemp).arg(channel1Gain)) : "DISCONNECTED" }
 
         Rectangle {
             id:     channel2Background
@@ -575,7 +584,7 @@ Window {
 
             Label { id: label2; text: "Channel 2" }
         }
-        Label { text: channel2Active ? (qsTr("%1 %2 %3").arg(channel2PulseValue.toFixed(6)).arg(channel2PulsePercent.toFixed(2)).arg(channel2CPUTemp)) : "DISCONNECTED" }
+        Label { text: channel2Active ? (qsTr("%1 %2% %3c %4g").arg(channel2PulseValue.toFixed(6)).arg(channel2PulsePercent.toFixed(2)).arg(channel2CPUTemp).arg(channel2Gain)) : "DISCONNECTED" }
 
         Rectangle {
             id:     channel3Background
@@ -591,7 +600,7 @@ Window {
 
             Label { id: label3; text: "Channel 3" }
         }
-        Label { text: channel3Active ? (qsTr("%1 %2 %3").arg(channel3PulseValue.toFixed(6)).arg(channel3PulsePercent.toFixed(2)).arg(channel3CPUTemp)) : "DISCONNECTED" }
+        Label { text: channel3Active ? (qsTr("%1 %2% %3c %4g").arg(channel3PulseValue.toFixed(6)).arg(channel3PulsePercent.toFixed(2)).arg(channel3CPUTemp).arg(channel3Gain)) : "DISCONNECTED" }
     }
 
     Component {

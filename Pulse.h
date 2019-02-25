@@ -14,8 +14,6 @@ public:
     Q_INVOKABLE void setGain(int gain);
     Q_INVOKABLE double log10(double value);
 
-    void emitPulse(int channelIndex, float cpuTemp, float pulseValue);
-
 signals:
     void pulse(int channelIndex, float cpuTemp, float pulseValue);
     void setGainSignal(int gain);

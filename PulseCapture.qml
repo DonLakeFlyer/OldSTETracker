@@ -171,7 +171,7 @@ Window {
 
     Timer {
         id:             pulseSimulator
-        running:        true
+        running:        false
         interval:       2000
         repeat:         true
 
@@ -343,7 +343,7 @@ Window {
             headingAdjust = (1 - (rightPulse / leftPulse)) / 0.5
             heading = rgHeading[strongestChannel] - (45.0 * headingAdjust)
         }
-        //console.log(qsTr("rightPulse(%1) leftPulse(%2) headingAdjust(%3)").arg(rightPulse).arg(leftPulse).arg(headingAdjust))
+        console.log(qsTr("leftPulse(%1) centerPulse(%2) rightPulse(%3) headingAdjust(%4)").arg(leftPulse).arg(strongestPulsePct).arg(rightPulse).arg(headingAdjust))
 
         //var strongestPulseMultipler = 100.0 / strongestPulsePct
 

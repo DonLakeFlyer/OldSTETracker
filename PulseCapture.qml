@@ -18,7 +18,7 @@ Window {
     readonly property real minRawPulse:                     0.0001
     //readonly property real log10PulseRange:                 pulse.log10(maxRawPulse) - pulse.log10(minRawPulse)
     readonly property real pulseRange:                      maxRawPulse - minRawPulse
-    readonly property real gainTargetPulsePercent:          0.5
+    readonly property real gainTargetPulsePercent:          0.75
     readonly property real gainTargetPulsePercentWindow:    0.1
     readonly property int  minGain:                         1
     readonly property int  maxGain:                         15
@@ -287,7 +287,7 @@ Window {
     // Determine max pulse strength and adjust gain
     Timer {
         running:    true
-        interval:   15000
+        interval:   10000
         repeat:     true
 
         onTriggered: {
@@ -296,7 +296,7 @@ Window {
             }
 
             var maxPulsePct = Math.max(channel0PulsePercent, Math.max(channel1PulsePercent, Math.max(channel2PulsePercent, channel3PulsePercent)))
-            //console.log("maxPulsePct", maxPulsePct)
+            console.log("maxPulsePct", maxPulsePct)
             var newGain = gain
             if (maxPulsePct > gainTargetPulsePercent + gainTargetPulsePercentWindow) {
                 if (gain > minGain) {
@@ -343,7 +343,7 @@ Window {
             headingAdjust = (1 - (rightPulse / leftPulse)) / 0.5
             heading = rgHeading[strongestChannel] - (45.0 * headingAdjust)
         }
-        console.log(qsTr("leftPulse(%1) centerPulse(%2) rightPulse(%3) headingAdjust(%4)").arg(leftPulse).arg(strongestPulsePct).arg(rightPulse).arg(headingAdjust))
+        //console.log(qsTr("leftPulse(%1) centerPulse(%2) rightPulse(%3) headingAdjust(%4)").arg(leftPulse).arg(strongestPulsePct).arg(rightPulse).arg(headingAdjust))
 
         //var strongestPulseMultipler = 100.0 / strongestPulsePct
 
@@ -365,7 +365,7 @@ Window {
         } else if (heading < 0) {
             heading += 360
         }
-        console.log("Estimated Heading:", heading)
+        //console.log("Estimated Heading:", heading)
     }
 
     Text {

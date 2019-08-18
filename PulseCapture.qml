@@ -16,7 +16,7 @@ Window {
     readonly property real gainTargetPulsePercent:          0.75
     readonly property real gainTargetPulsePercentWindow:    0.1
     readonly property int  minGain:                         1
-    readonly property int  maxGain:                         15
+    readonly property int  maxGain:                         20
     readonly property int  channelTimeoutMSecs:             10000
     readonly property var   dbRadiationPct:                 [ 1.0,  .97,    .94,    .85,    .63,    .40,    .10,    .20,    .30,    .40,    .45,    0.5,    0.51 ]
     readonly property var   dbRadiationAngle:               [ 0,    15,     30,     45,     60,     75,     90,     105,    120,    135,    150,    165,    180 ]

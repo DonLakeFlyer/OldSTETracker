@@ -13,24 +13,22 @@ Window {
     height: 480
     title: qsTr("STE Tracker")
 
-
-    readonly property real maxRawPulse:                     20
-    readonly property real minRawPulse:                     0.0001
-    //readonly property real log10PulseRange:                 pulse.log10(maxRawPulse) - pulse.log10(minRawPulse)
-    readonly property real pulseRange:                      maxRawPulse - minRawPulse
     readonly property real gainTargetPulsePercent:          0.75
     readonly property real gainTargetPulsePercentWindow:    0.1
     readonly property int  minGain:                         1
     readonly property int  maxGain:                         15
     readonly property int  channelTimeoutMSecs:             10000
     readonly property var   dbRadiationPct:                 [ 1.0,  .97,    .94,    .85,    .63,    .40,    .10,    .20,    .30,    .40,    .45,    0.5,    0.51 ]
-    readonly property real  dbRadiationMinPulse:            maxRawPulse * 0.25
     readonly property var   dbRadiationAngle:               [ 0,    15,     30,     45,     60,     75,     90,     105,    120,    135,    150,    165,    180 ]
     readonly property real  dbRadiationAngleInc:            15
 
-    property bool autoGain: true
-    property int  gain:     21
-    property real heading:  0
+    property real  dbRadiationMinPulse:            settings.maxRawPulse * 0.25
+
+    property real pulseRange:           settings.maxRawPulse - settings.minRawPulse
+    property int  gain:                 21
+    property real heading:              0
+    property bool headingAvailable:     false
+    property bool headingLowQuality:    true
 
     property bool channel0FirstFreqSent: false
     property bool channel1FirstFreqSent: false
@@ -68,12 +66,23 @@ Window {
     property int  freqDigit4
     property int  freqDigit5
     property int  freqDigit6
+    property int  freqDigit7
     property int  freqInt
+    property int  freqStart
 
     property real fontPixelWidth:       textMeasureDefault.fontPixelWidth
     property real fontPixelHeight:      textMeasureDefault.fontPixelHeight
     property real fontPixelWidthLarge:  textMeasureLarge.fontPixelWidth
     property real fontPixelHeightLarge: textMeasureLarge.fontPixelHeight
+
+    Settings {
+        id: settings
+
+        property int    frequency:      1460000
+        property real   minRawPulse:    0.01
+        property real   maxRawPulse:    40
+        property bool   autoGain:       false
+    }
 
     onChannel0PulseValueChanged: { channel0Background.color = "green"; channel0Animate.restart() }
     onChannel1PulseValueChanged: { channel1Background.color = "green"; channel1Animate.restart() }
@@ -86,20 +95,9 @@ Window {
     onChannel3PulsePercentChanged: channel3PulseSlice.requestPaint()
 
     Component.onCompleted: {
-        var rgDigits = [ 0, 0, 0, 0, 0, 0 ]
-        var digitIndex = 5
         freqInt = settings.frequency
-        while (freqInt > 0) {
-            rgDigits[digitIndex] = freqInt % 10
-            freqInt = freqInt / 10;
-            digitIndex--
-        }
-        freqDigit1 = rgDigits[0]
-        freqDigit2 = rgDigits[1]
-        freqDigit3 = rgDigits[2]
-        freqDigit4 = rgDigits[3]
-        freqDigit5 = rgDigits[4]
-        freqDigit6 = rgDigits[5]
+        freqStart = freqInt
+        updateDigitsFromFreqInt()
     }
 
     onFreqDigit1Changed: setFrequencyFromDigits()
@@ -108,21 +106,43 @@ Window {
     onFreqDigit4Changed: setFrequencyFromDigits()
     onFreqDigit5Changed: setFrequencyFromDigits()
     onFreqDigit6Changed: setFrequencyFromDigits()
+    onFreqDigit7Changed: setFrequencyFromDigits()
 
     function setFrequencyFromDigits() {
-        settings.frequency = (freqDigit1 * 100000) + (freqDigit2 * 10000) + (freqDigit3 * 1000) + (freqDigit4 * 100) + (freqDigit5 * 10) + (freqDigit6)
-        pulse.setFreq(settings.frequency * 1000)
+        freqInt = (freqDigit1 * 1000000) + (freqDigit2 * 100000) + (freqDigit3 * 10000) + (freqDigit4 * 1000) + (freqDigit5 * 100) + (freqDigit6 * 10) + freqDigit7
+        settings.frequency = freqInt
+        sendFreqChange()
+    }
+
+    function updateDigitsFromFreqInt() {
+        var rgDigits = [ 0, 0, 0, 0, 0, 0, 0 ]
+        var digitIndex = 6
+        var freqIntWorker = freqInt
+        while (freqIntWorker > 0) {
+            rgDigits[digitIndex] = freqIntWorker % 10
+            freqIntWorker = freqIntWorker / 10;
+            digitIndex--
+        }
+        freqDigit1 = rgDigits[0]
+        freqDigit2 = rgDigits[1]
+        freqDigit3 = rgDigits[2]
+        freqDigit4 = rgDigits[3]
+        freqDigit5 = rgDigits[4]
+        freqDigit6 = rgDigits[5]
+        freqDigit7 = rgDigits[6]
+
+    }
+
+    function sendFreqChange() {
+        pulse.setFreq(freqInt * 100)
     }
 
     function _handlePulse(channelIndex, cpuTemp, pulseValue, gain) {
-        //console.log("Pulse", channelIndex, cpuTemp.toFixed(0), pulseValue.toFixed(5), pulse.log10(pulseValue))
-        //console.log("log pulse %", (pulse.log10(pulseValue) - pulse.log10(minRawPulse)) / log10PulseRange)
         var pulsePercent
         if (pulseValue == 0) {
             pulsePercent = 0
         } else {
-            //pulsePercent = (pulse.log10(pulseValue) - pulse.log10(minRawPulse)) / log10PulseRange
-            pulsePercent = (pulseValue - minRawPulse) / pulseRange
+            pulsePercent = (pulseValue - settings.minRawPulse) / pulseRange
         }
         if (channelIndex === 0) {
             channel0Active = true
@@ -133,7 +153,7 @@ Window {
             channel0NoPulseTimer.restart()
             if (!channel0FirstFreqSent) {
                 channel0FirstFreqSent = true
-                setFrequencyFromDigits()
+                sendFreqChange()
             }
         } else if (channelIndex === 1) {
             channel1Active = true
@@ -144,7 +164,7 @@ Window {
             channel1NoPulseTimer.restart()
             if (!channel1FirstFreqSent) {
                 channel1FirstFreqSent = true
-                setFrequencyFromDigits()
+                sendFreqChange()
             }
         } else if (channelIndex === 2) {
             channel2Active = true
@@ -155,7 +175,7 @@ Window {
             channel2NoPulseTimer.restart()
             if (!channel2FirstFreqSent) {
                 channel2FirstFreqSent = true
-                setFrequencyFromDigits()
+                sendFreqChange()
             }
         } else if (channelIndex === 3) {
             channel3Active = true
@@ -166,7 +186,7 @@ Window {
             channel3NoPulseTimer.restart()
             if (!channel3FirstFreqSent) {
                 channel3FirstFreqSent = true
-                setFrequencyFromDigits()
+                sendFreqChange()
             }
         }
         updateHeading()
@@ -176,6 +196,22 @@ Window {
         target: pulse
 
         onPulse: _handlePulse(channelIndex, cpuTemp, pulseValue, gain)
+    }
+
+    // Drift range testing
+    Timer {
+        running:    false
+        interval:   5000
+        repeat:     true
+
+        onTriggered: {
+            freqInt += 1
+            if (freqInt > freqStart + 20) {
+                freqInt = freqStart
+            }
+            console.log(freqInt, freqStart)
+            updateDigitsFromFreqInt()
+        }
     }
 
     Timer {
@@ -210,7 +246,7 @@ Window {
 
             //console.log(qsTr("heading(%1) radiationIndex(%2) powerLow(%3) powerHigh(%4) powerRange(%5) slicePct(%6) powerHeading(%7)").arg(heading).arg(radiationIndex).arg(powerLow).arg(powerHigh).arg(powerRange).arg(slicePct).arg(powerHeading))
 
-            var pulseValue = dbRadiationMinPulse + ((maxRawPulse - dbRadiationMinPulse) * powerHeading)
+            var pulseValue = dbRadiationMinPulse + ((settings.maxRawPulse - dbRadiationMinPulse) * powerHeading)
             console.log("heading:pulse", heading, pulseValue)
 
             _handlePulse(channel, 0, pulseValue)
@@ -233,12 +269,6 @@ Window {
             pulseSimulator.generatePulse(2, pulseSimulator.normalizeHeading(pulseSimulator.heading - 180))
             pulseSimulator.generatePulse(3, pulseSimulator.normalizeHeading(pulseSimulator.heading - 270))
         }
-    }
-
-    Settings {
-        id: settings
-
-        property int frequency: 146000
     }
 
     Timer {
@@ -300,7 +330,7 @@ Window {
         repeat:     true
 
         onTriggered: {
-            if (!autoGain) {
+            if (!settings.autoGain) {
                 return
             }
 
@@ -325,6 +355,9 @@ Window {
     }
 
     function updateHeading() {
+        headingAvailable = true
+        headingLowQuality = false
+
         // Find strongest channel
         var strongestChannel = -1
         var strongestPulsePct = -1
@@ -336,6 +369,13 @@ Window {
             }
         }
 
+        if (strongestPulsePct == 0) {
+            // No antennas are picking up a signal
+            headingAvailable = false
+            headingLowQuality = true
+            return
+        }
+
         var rgLeft = [ 3, 0, 1, 2 ]
         var rgRight = [ 1, 2, 3, 0 ]
         var rgHeading = [ 0.0, 90.0, 180.0, 270.0 ]
@@ -344,30 +384,33 @@ Window {
         var leftPulse = rgPulse[rgLeft[strongestChannel]]
         var rightPulse = rgPulse[rgRight[strongestChannel]]
 
+        // Start the the best simple single antenna estimate
+        heading = rgHeading[strongestChannel]
+
+        if (rightPulse == 0 && leftPulse == 0) {
+            // All we have is one antenna
+            headingLowQuality = true
+            return
+        }
+
+        // Take into acount left/right side strengths
         var headingAdjust
         if (rightPulse > leftPulse) {
-            headingAdjust = (1 - (leftPulse / rightPulse)) / 0.5
-            heading = rgHeading[strongestChannel] + (45.0 * headingAdjust)
+            if (leftPulse == 0) {
+                headingAdjust = rightPulse / strongestPulsePct
+            } else {
+                headingAdjust = (1 - (leftPulse / rightPulse)) / 0.5
+            }
+            heading += 45.0 * headingAdjust
         } else {
-            headingAdjust = (1 - (rightPulse / leftPulse)) / 0.5
-            heading = rgHeading[strongestChannel] - (45.0 * headingAdjust)
+            if (rightPulse == 0) {
+                headingAdjust = leftPulse / strongestPulsePct
+            } else {
+                headingAdjust = (1 - (rightPulse / leftPulse)) / 0.5
+            }
+            heading -= 45.0 * headingAdjust
         }
-        //console.log(qsTr("leftPulse(%1) centerPulse(%2) rightPulse(%3) headingAdjust(%4)").arg(leftPulse).arg(strongestPulsePct).arg(rightPulse).arg(headingAdjust))
-
-        //var strongestPulseMultipler = 100.0 / strongestPulsePct
-
-        /*
-        if (leftPulse > rightPulse) {
-            //console.log("updateHeading", strongestChannel, "left")
-            strongLeft = true
-            heading = rgHeading[strongestChannel]
-            heading -= 45.0 * strongestPulsePct * leftPulse
-        } else {
-            //console.log("updateHeading", strongestChannel, "right")
-            strongLeft = false
-            heading = rgHeading[strongestChannel]
-            heading += 45.0 * strongestPulsePct * rightPulse
-        }*/
+        console.log(qsTr("leftPulse(%1) centerPulse(%2) rightPulse(%3) headingAdjust(%4)").arg(leftPulse).arg(strongestPulsePct).arg(rightPulse).arg(headingAdjust))
 
         if (heading > 360) {
             heading -= 360
@@ -436,10 +479,26 @@ Window {
             }
         }
 
+        /*
+        Text {
+            anchors.left:   parent.left
+            anchors.right:  parent.right
+            text:           "Low Quality"
+            font.pointSize: 100
+            fontSizeMode:   Text.HorizontalFit
+            visible:        headingLowQuality
+
+            MouseArea {
+                anchors.fill:   parent
+                onClicked:      freqEditor.visible = true
+            }
+        }
+*/
+
         Text {
             anchors.left:       parent.left
             anchors.right:      parent.right
-            text:               (autoGain ? "Auto" : "Manual") + " Gain " + gain
+            text:               (settings.autoGain ? "Auto" : "Manual") + " Gain " + gain
             font.pointSize:     100
             fontSizeMode:       Text.HorizontalFit
 
@@ -450,7 +509,6 @@ Window {
         }
     }
 
-    // Heading Indicator
     Rectangle {
         id:                 headingIndicator
         anchors.margins:    fontPixelWidth
@@ -521,6 +579,7 @@ Window {
             anchors.bottomMargin:   _pointerMargin
             anchors.fill:           parent
             sourceSize.height:      parent.height
+            visible:                headingAvailable
 
             transform: Rotation {
                 origin.x:       pointer.width  / 2
@@ -531,7 +590,6 @@ Window {
             readonly property real _pointerMargin: -10
         }
     }
-
 
     GridLayout {
         anchors.left:   parent.left
@@ -552,7 +610,7 @@ Window {
 
             Label { id: label0; text: "Channel 0" }
         }
-        Label { text: channel0Active ? (qsTr("%1 %2% %3c %4g").arg(channel0PulseValue.toFixed(6)).arg(channel0PulsePercent.toFixed(2)).arg(channel0CPUTemp).arg(channel0Gain)) : "DISCONNECTED" }
+        Label { text: channel0Active ? (qsTr("%1 %2% %3c %4g").arg(channel0PulseValue.toFixed(3)).arg(channel0PulsePercent.toFixed(1)).arg(channel0CPUTemp).arg(channel0Gain)) : "DISCONNECTED" }
 
         Rectangle {
             id:     channel1Background
@@ -568,7 +626,7 @@ Window {
 
             Label { id: label1; text: "Channel 1" }
         }
-        Label { text: channel1Active ? (qsTr("%1 %2% %3c %4g").arg(channel1PulseValue.toFixed(6)).arg(channel1PulsePercent.toFixed(2)).arg(channel1CPUTemp).arg(channel1Gain)) : "DISCONNECTED" }
+        Label { text: channel1Active ? (qsTr("%1 %2% %3c %4g").arg(channel1PulseValue.toFixed(3)).arg(channel1PulsePercent.toFixed(1)).arg(channel1CPUTemp).arg(channel1Gain)) : "DISCONNECTED" }
 
         Rectangle {
             id:     channel2Background
@@ -584,7 +642,7 @@ Window {
 
             Label { id: label2; text: "Channel 2" }
         }
-        Label { text: channel2Active ? (qsTr("%1 %2% %3c %4g").arg(channel2PulseValue.toFixed(6)).arg(channel2PulsePercent.toFixed(2)).arg(channel2CPUTemp).arg(channel2Gain)) : "DISCONNECTED" }
+        Label { text: channel2Active ? (qsTr("%1 %2% %3c %4g").arg(channel2PulseValue.toFixed(3)).arg(channel2PulsePercent.toFixed(1)).arg(channel2CPUTemp).arg(channel2Gain)) : "DISCONNECTED" }
 
         Rectangle {
             id:     channel3Background
@@ -600,7 +658,7 @@ Window {
 
             Label { id: label3; text: "Channel 3" }
         }
-        Label { text: channel3Active ? (qsTr("%1 %2% %3c %4g").arg(channel3PulseValue.toFixed(6)).arg(channel3PulsePercent.toFixed(2)).arg(channel3CPUTemp).arg(channel3Gain)) : "DISCONNECTED" }
+        Label { text: channel3Active ? (qsTr("%1 %2% %3c %4g").arg(channel3PulseValue.toFixed(3)).arg(channel3PulsePercent.toFixed(1)).arg(channel3CPUTemp).arg(channel3Gain)) : "DISCONNECTED" }
     }
 
     Component {
@@ -724,6 +782,17 @@ Window {
                     onValueChanged: freqDigit6 = loader6.item.value
                 }
             }
+
+            Loader {
+                id:                     loader7
+                sourceComponent:        digitSpinnerComponent
+                Component.onCompleted:  item.value = freqDigit7
+
+                Connections {
+                    target:         loader7.item
+                    onValueChanged: freqDigit7 = loader7.item.value
+                }
+            }
         }
     }
 
@@ -735,7 +804,7 @@ Window {
         CheckBox {
             id:         autoGainCheckbox
             text:       "Auto-Gain"
-            checked:    autoGain
+            checked:    settings.autoGain
 
             style: CheckBoxStyle {
                 id: checkboxStyle
@@ -745,21 +814,16 @@ Window {
                 }
             }
 
-            onClicked:  autoGain = checked
-        }
-
-        Button {
-            anchors.right:  parent.right
-            text:           "Close"
-            onClicked:      gainEditor.visible = false
+            onClicked:  settings.autoGain = checked
         }
 
         Rectangle {
-            anchors.centerIn:   parent
-            width:              textMeasureExtraLarge.fontPixelWidth * 2.25
-            height:             textMeasureExtraLarge.fontPixelHeight * 2
-            color:              "black"
-            enabled:            !autoGainCheckbox.checked
+            id:                     gainSpinner
+            anchors.verticalCenter: parent.verticalCenter
+            width:                  textMeasureExtraLarge.fontPixelWidth * 2.25
+            height:                 textMeasureExtraLarge.fontPixelHeight * 2
+            color:                  "black"
+            enabled:                !autoGainCheckbox.checked
 
             property alias value: list.currentIndex
 
@@ -795,6 +859,59 @@ Window {
                     GradientStop { position: 0.3; color: "#00000000" }
                     GradientStop { position: 0.7; color: "#00000000" }
                     GradientStop { position: 1.0; color: "#FF000000" }
+                }
+            }
+        }
+
+        Button {
+            id:             closeButton
+            anchors.right:  parent.right
+            text:           "Close"
+            onClicked:      gainEditor.visible = false
+        }
+
+        ColumnLayout {
+            anchors.left:   gainSpinner.right
+            anchors.right:  parent.right
+            anchors.top:    parent.top
+            anchors.bottom: parent.bottom
+
+            RowLayout {
+                Layout.fillWidth: true
+
+                Label {
+                    Layout.preferredWidth: fontPixelWidthLarge * 8
+                    text:   qsTr("Min (%1)").arg(settings.minRawPulse)
+                    font.pointSize:             textMeasureLarge.font.pointSize
+
+                }
+
+                Slider {
+                    minimumValue:       0.01
+                    maximumValue:       0.1
+                    stepSize:           0.01
+                    value:              settings.minRawPulse
+                    Layout.fillWidth:   true
+                    onValueChanged:     settings.minRawPulse = value
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+
+                Label {
+                    Layout.preferredWidth: fontPixelWidthLarge * 8
+                    text:   qsTr("Max (%1)").arg(settings.maxRawPulse)
+                    font.pointSize:             textMeasureLarge.font.pointSize
+                }
+
+                Slider {
+                    minimumValue:       1
+                    maximumValue:       40
+                    stepSize:           0.1
+                    value:              settings.maxRawPulse
+                    Layout.fillWidth:   true
+                    onValueChanged:     settings.maxRawPulse = value
                 }
             }
         }

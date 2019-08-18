@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
     QGuiApplication application(argc, argv);
     application.setOrganizationName("LF Software Consulting");
     application.setOrganizationDomain("latestfiasco.com");
-    application.setApplicationName("VHF Collor Scanner");
+    application.setApplicationName("VHF Collar Scanner");
 
     UDPLink udpLink;
     Pulse pulse;

@@ -80,7 +80,7 @@ Window {
 
         property int    frequency:      1460000
         property real   minRawPulse:    0.01
-        property real   maxRawPulse:    40
+        property real   maxRawPulse:    20
         property bool   autoGain:       false
     }
 

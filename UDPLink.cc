@@ -123,13 +123,15 @@ void UDPLink::_readBytes()
         //  int -   channel index
         //  float - pulse value
         //  float - cpu temp
+        //  int -   freq
         //  int -   gain
-        int expectedSize = (sizeof(int) * 2) + (sizeof(float) * 2);
+        int expectedSize = (sizeof(int) * 3) + (sizeof(float) * 2);
         if (datagram.size() == expectedSize) {
             struct PulseInfo_s {
                 int     channelIndex;
                 float   pulseValue;
                 float   cpuTemp;
+                int     freq;
                 int     gain;
             };
             const struct PulseInfo_s* pulseInfo = (const struct PulseInfo_s*)datagram.constData();

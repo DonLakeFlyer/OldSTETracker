@@ -27,6 +27,7 @@ Window {
     property real pulseRange:           settings.maxRawPulse - settings.minRawPulse
     property int  gain:                 21
     property real heading:              0
+    property real newHeading:           0
     property bool headingAvailable:     false
     property bool headingLowQuality:    true
 
@@ -75,7 +76,7 @@ Window {
     property real fontPixelWidthLarge:  textMeasureLarge.fontPixelWidth
     property real fontPixelHeightLarge: textMeasureLarge.fontPixelHeight
 
-    Settings {
+    Item {
         id: settings
 
         property int    frequency:      1460000
@@ -385,7 +386,7 @@ Window {
         var rightPulse = rgPulse[rgRight[strongestChannel]]
 
         // Start the the best simple single antenna estimate
-        heading = rgHeading[strongestChannel]
+        newHeading = rgHeading[strongestChannel]
 
         if (rightPulse == 0 && leftPulse == 0) {
             // All we have is one antenna
@@ -401,24 +402,44 @@ Window {
             } else {
                 headingAdjust = (1 - (leftPulse / rightPulse)) / 0.5
             }
-            heading += 45.0 * headingAdjust
+            newHeading += 45.0 * headingAdjust
         } else {
             if (rightPulse == 0) {
                 headingAdjust = leftPulse / strongestPulsePct
             } else {
                 headingAdjust = (1 - (rightPulse / leftPulse)) / 0.5
             }
-            heading -= 45.0 * headingAdjust
+            newHeading -= 45.0 * headingAdjust
         }
-        console.log(qsTr("leftPulse(%1) centerPulse(%2) rightPulse(%3) headingAdjust(%4)").arg(leftPulse).arg(strongestPulsePct).arg(rightPulse).arg(headingAdjust))
+        //console.log(qsTr("leftPulse(%1) centerPulse(%2) rightPulse(%3) headingAdjust(%4)").arg(leftPulse).arg(strongestPulsePct).arg(rightPulse).arg(headingAdjust))
 
-        if (heading > 360) {
-            heading -= 360
-        } else if (heading < 0) {
-            heading += 360
+        if (newHeading > 360) {
+            newHeading -= 360
+        } else if (newHeading < 0) {
+            newHeading += 360
         }
+
         //console.log("Estimated Heading:", heading)
     }
+
+    // This timer updates the heading value using a low pass filter
+    Timer {
+        running:    true
+        interval:   1000
+        repeat:     true
+
+        onTriggered: {
+            var filteredHeading = (heading * 0.9) + (newHeading * 0.1)
+            if (filteredHeading > 360) {
+                filteredHeading -= 360
+            } else if (filteredHeading < 0) {
+                filteredHeading += 360
+            }
+            heading = filteredHeading
+            console.log("tick", heading, filteredHeading, newHeading)
+        }
+    }
+
 
     Text {
         id:         textMeasureDefault

@@ -206,7 +206,7 @@ void UDPLink::setGain(int gain)
     command[0] = 1;
     command[1] = gain;
     bytes.setRawData((const char *)&command, sizeof(command));
-    _writeBytes(bytes);
+    //_writeBytes(bytes);
 }
 
 void UDPLink::setFreq(int freq)
@@ -216,5 +216,5 @@ void UDPLink::setFreq(int freq)
     command[0] = 2;
     command[1] = freq;
     bytes.setRawData((const char *)&command, sizeof(command));
-    _writeBytes(bytes);
+    //_writeBytes(bytes);
 }

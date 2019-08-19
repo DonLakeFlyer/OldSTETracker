@@ -30,6 +30,7 @@ Window {
     property real newHeading:           0
     property bool headingAvailable:     false
     property bool headingLowQuality:    true
+    property int  zoomFactor:           1
 
     property bool channel0FirstFreqSent: false
     property bool channel1FirstFreqSent: false
@@ -138,6 +139,15 @@ Window {
         pulse.setFreq(freqInt * 100)
     }
 
+    function _normalizeHeading(heading) {
+        if (heading >= 360.0) {
+            heading = heading - 360.0
+        } else if (heading < 0) {
+            heading = heading + 360
+        }
+        return heading
+    }
+
     function _handlePulse(channelIndex, cpuTemp, pulseValue, gain) {
         var pulsePercent
         if (pulseValue == 0) {
@@ -191,6 +201,30 @@ Window {
             }
         }
         updateHeading()
+
+        // Update zoom factor
+        var maxChannelPulseValue = Math.max(channel0PulseValue, Math.max(channel1PulseValue, Math.max(channel2PulseValue, channel3PulseValue)))
+        var normalizedMaxChannelPulseValue = maxChannelPulseValue - settings.minRawPulse
+        var normalizedMaxRawPulse = settings.maxRawPulse - settings.minRawPulse
+
+        var newZoomFactor = 1
+        if (maxChannelPulseValue < settings.minRawPulse) {
+            newZoomFactor = 4
+        } else if (normalizedMaxChannelPulseValue < normalizedMaxRawPulse / 2) {
+            if (normalizedMaxChannelPulseValue < normalizedMaxRawPulse / 4) {
+                newZoomFactor = 4
+            } else {
+                newZoomFactor = 2
+            }
+        }
+
+        if (newZoomFactor != zoomFactor) {
+            zoomFactor = newZoomFactor
+            channel0PulseSlice.requestPaint()
+            channel1PulseSlice.requestPaint()
+            channel2PulseSlice.requestPaint()
+            channel3PulseSlice.requestPaint()
+        }
     }
 
     Connections {
@@ -215,19 +249,25 @@ Window {
         }
     }
 
+    // Simulator
     Timer {
         id:             pulseSimulator
         running:        false
         interval:       2000
         repeat:         true
 
-        property real heading:          0
-        property real headingIncrement: 5
+        property real heading:              0
+        property real headingIncrement:     10
+        property real pulseAdjustFactor:    1
+        property real pulseAdjustIncrement: 0.05
+        property real pulseAdjustDirection: -1
+
+        readonly property real minPulseAdjustFactor: 0.01
 
         onTriggered: pulseSimulator.nextHeading()
 
         function generatePulse(channel, heading) {
-            console.log("original", heading)
+            //console.log("original", heading)
             if ( heading > 180) {
                 heading = 180 - (heading - 180)
             }
@@ -247,28 +287,32 @@ Window {
 
             //console.log(qsTr("heading(%1) radiationIndex(%2) powerLow(%3) powerHigh(%4) powerRange(%5) slicePct(%6) powerHeading(%7)").arg(heading).arg(radiationIndex).arg(powerLow).arg(powerHigh).arg(powerRange).arg(slicePct).arg(powerHeading))
 
+            var simulatedMaxRawPulse = settings.maxRawPulse
             var pulseValue = dbRadiationMinPulse + ((settings.maxRawPulse - dbRadiationMinPulse) * powerHeading)
-            console.log("heading:pulse", heading, pulseValue)
+            pulseValue *= pulseAdjustFactor
 
-            _handlePulse(channel, 0, pulseValue)
-        }
+            //console.log("heading:pulse", heading, pulseValue)
 
-        function normalizeHeading(heading) {
-            if (heading >= 360.0) {
-                heading = heading - 360.0
-            } else if (heading < 0) {
-                heading = heading + 360
-            }
-            return heading
+            _handlePulse(channel, 0, pulseValue, 21)
         }
 
         function nextHeading() {
-            pulseSimulator.heading = pulseSimulator.normalizeHeading(pulseSimulator.heading + pulseSimulator.headingIncrement)
-            console.log("Simulated Heading", heading)
+            pulseSimulator.heading = _normalizeHeading(pulseSimulator.heading + pulseSimulator.headingIncrement)
+            console.log("Simulated Heading", heading, pulseAdjustFactor)
+
             pulseSimulator.generatePulse(0, pulseSimulator.heading)
-            pulseSimulator.generatePulse(1, pulseSimulator.normalizeHeading(pulseSimulator.heading - 90))
-            pulseSimulator.generatePulse(2, pulseSimulator.normalizeHeading(pulseSimulator.heading - 180))
-            pulseSimulator.generatePulse(3, pulseSimulator.normalizeHeading(pulseSimulator.heading - 270))
+            pulseSimulator.generatePulse(1, _normalizeHeading(pulseSimulator.heading - 90))
+            pulseSimulator.generatePulse(2, _normalizeHeading(pulseSimulator.heading - 180))
+            pulseSimulator.generatePulse(3, _normalizeHeading(pulseSimulator.heading - 270))
+
+            pulseAdjustFactor = pulseAdjustFactor + (pulseAdjustIncrement * pulseAdjustDirection)
+            if (pulseAdjustFactor < minPulseAdjustFactor) {
+                pulseAdjustFactor = minPulseAdjustFactor
+                pulseAdjustDirection = 1
+            } else if (pulseAdjustFactor > 1) {
+                pulseAdjustFactor = 1
+                pulseAdjustDirection = -1
+            }
         }
     }
 
@@ -324,34 +368,48 @@ Window {
         }
     }
 
-    // Determine max pulse strength and adjust gain
+    // Determine max pulse strength:
+    //  - Adjust gain if auto-gain
     Timer {
         running:    true
         interval:   10000
         repeat:     true
 
         onTriggered: {
-            if (!settings.autoGain) {
-                return
-            }
+            if (settings.autoGain) {
+                var maxPulsePct = Math.max(channel0PulsePercent, Math.max(channel1PulsePercent, Math.max(channel2PulsePercent, channel3PulsePercent)))
+                //console.log("maxPulsePct", maxPulsePct)
 
-            var maxPulsePct = Math.max(channel0PulsePercent, Math.max(channel1PulsePercent, Math.max(channel2PulsePercent, channel3PulsePercent)))
-            console.log("maxPulsePct", maxPulsePct)
-            var newGain = gain
-            if (maxPulsePct > gainTargetPulsePercent + gainTargetPulsePercentWindow) {
-                if (gain > minGain) {
-                    newGain = gain - 1
+                var newGain = gain
+                if (maxPulsePct > gainTargetPulsePercent + gainTargetPulsePercentWindow) {
+                    if (gain > minGain) {
+                        newGain = gain - 1
+                    }
+                } else if (maxPulsePct < gainTargetPulsePercent - gainTargetPulsePercentWindow) {
+                    if (gain < maxGain) {
+                        newGain = gain + 1
+                    }
                 }
-            } else if (maxPulsePct < gainTargetPulsePercent - gainTargetPulsePercentWindow) {
-                if (gain < maxGain) {
-                    newGain = gain + 1
+                if (newGain !== gain) {
+                    console.log("Adjusting gain", newGain)
+                    gain = newGain
+                    pulse.setGain(gain)
                 }
             }
-            if (newGain !== gain) {
-                console.log("Adjusting gain", newGain)
-                gain = newGain
-                pulse.setGain(gain)
-            }
+        }
+    }
+
+    // This timer updates the heading value using a low pass filter
+    Timer {
+        running:    true
+        interval:   1000
+        repeat:     true
+
+        onTriggered: {
+            var filteredHeading = (heading * 0.9) + (newHeading * 0.1)
+            filteredHeading = _normalizeHeading(filteredHeading)
+            heading = filteredHeading
+            //console.log("tick", heading, filteredHeading, newHeading)
         }
     }
 
@@ -413,33 +471,10 @@ Window {
         }
         //console.log(qsTr("leftPulse(%1) centerPulse(%2) rightPulse(%3) headingAdjust(%4)").arg(leftPulse).arg(strongestPulsePct).arg(rightPulse).arg(headingAdjust))
 
-        if (newHeading > 360) {
-            newHeading -= 360
-        } else if (newHeading < 0) {
-            newHeading += 360
-        }
+        newHeading = _normalizeHeading(newHeading)
 
         //console.log("Estimated Heading:", heading)
     }
-
-    // This timer updates the heading value using a low pass filter
-    Timer {
-        running:    true
-        interval:   1000
-        repeat:     true
-
-        onTriggered: {
-            var filteredHeading = (heading * 0.9) + (newHeading * 0.1)
-            if (filteredHeading > 360) {
-                filteredHeading -= 360
-            } else if (filteredHeading < 0) {
-                filteredHeading += 360
-            }
-            heading = filteredHeading
-            console.log("tick", heading, filteredHeading, newHeading)
-        }
-    }
-
 
     Text {
         id:         textMeasureDefault
@@ -519,6 +554,19 @@ Window {
         Text {
             anchors.left:       parent.left
             anchors.right:      parent.right
+            text:               "Zoom " + zoomFactor
+            font.pointSize:     100
+            fontSizeMode:       Text.HorizontalFit
+
+            MouseArea {
+                anchors.fill:   parent
+                onClicked:      gainEditor.visible = true
+            }
+        }
+
+        Text {
+            anchors.left:       parent.left
+            anchors.right:      parent.right
             text:               (settings.autoGain ? "Auto" : "Manual") + " Gain " + gain
             font.pointSize:     100
             fontSizeMode:       Text.HorizontalFit
@@ -552,7 +600,7 @@ Window {
             onPaint: {
                 var ctx = getContext("2d");
                 ctx.reset();
-                drawSlice(0, ctx, parent._centerX, parent._centerY, parent.radius * channel0PulsePercent)
+                drawSlice(0, ctx, parent._centerX, parent._centerY, parent.radius * channel0PulsePercent * zoomFactor)
             }
         }
 
@@ -563,7 +611,7 @@ Window {
             onPaint: {
                 var ctx = getContext("2d");
                 ctx.reset();
-                drawSlice(1, ctx, parent._centerX, parent._centerY, parent.radius * channel1PulsePercent)
+                drawSlice(1, ctx, parent._centerX, parent._centerY, parent.radius * channel1PulsePercent * zoomFactor)
             }
         }
 
@@ -574,7 +622,7 @@ Window {
             onPaint: {
                 var ctx = getContext("2d");
                 ctx.reset();
-                drawSlice(2, ctx, parent._centerX, parent._centerY, parent.radius * channel2PulsePercent)
+                drawSlice(2, ctx, parent._centerX, parent._centerY, parent.radius * channel2PulsePercent * zoomFactor)
             }
         }
 
@@ -585,7 +633,7 @@ Window {
             onPaint: {
                 var ctx = getContext("2d");
                 ctx.reset();
-                drawSlice(3, ctx, parent._centerX, parent._centerY, parent.radius * channel3PulsePercent)
+                drawSlice(3, ctx, parent._centerX, parent._centerY, parent.radius * channel3PulsePercent * zoomFactor)
             }
         }
 

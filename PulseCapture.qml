@@ -406,10 +406,21 @@ Window {
         repeat:     true
 
         onTriggered: {
-            var filteredHeading = (heading * 0.9) + (newHeading * 0.1)
+            // If the differential in heading is > 180 degrees we need to make sure we adjust in the rotational
+            // direction which is the shortest rotation distance
+            var rotationAdjustedNewHeading = newHeading
+            if (Math.abs(heading - newHeading) > 180) {
+                if (newHeading > heading) {
+                    rotationAdjustedNewHeading -= 360
+                } else {
+                    rotationAdjustedNewHeading += 360
+                }
+            }
+
+            var filteredHeading = (heading * 0.9) + (rotationAdjustedNewHeading * 0.1)
+            console.log("tick", heading, newHeading, rotationAdjustedNewHeading, filteredHeading)
             filteredHeading = _normalizeHeading(filteredHeading)
             heading = filteredHeading
-            //console.log("tick", heading, filteredHeading, newHeading)
         }
     }
 
@@ -637,8 +648,9 @@ Window {
             }
         }
 
+        // Fitered heading indicator
         Image {
-            id:                     pointer
+            id:                     fiteredHeadingIndicator
             source:                 "qrc:/attitudePointer.svg"
             mipmap:                 true
             fillMode:               Image.PreserveAspectFit
@@ -651,9 +663,33 @@ Window {
             visible:                headingAvailable
 
             transform: Rotation {
-                origin.x:       pointer.width  / 2
-                origin.y:       pointer.height / 2
+                origin.x:       fiteredHeadingIndicator.width  / 2
+                origin.y:       fiteredHeadingIndicator.height / 2
                 angle:          heading
+            }
+
+            readonly property real _pointerMargin: -10
+        }
+
+        // Raw heading indicator
+        Image {
+            id:                     rawHeadingIndicator
+            source:                 "qrc:/attitudePointer.svg"
+            mipmap:                 true
+            fillMode:               Image.PreserveAspectFit
+            anchors.leftMargin:     _pointerMargin
+            anchors.rightMargin:    _pointerMargin
+            anchors.topMargin:      _pointerMargin
+            anchors.bottomMargin:   _pointerMargin
+            anchors.fill:           parent
+            sourceSize.height:      parent.height
+            visible:                headingAvailable
+            opacity:                0.5
+
+            transform: Rotation {
+                origin.x:       rawHeadingIndicator.width  / 2
+                origin.y:       rawHeadingIndicator.height / 2
+                angle:          newHeading
             }
 
             readonly property real _pointerMargin: -10

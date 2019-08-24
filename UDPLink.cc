@@ -135,7 +135,7 @@ void UDPLink::_readBytes()
                 int     gain;
             };
             const struct PulseInfo_s* pulseInfo = (const struct PulseInfo_s*)datagram.constData();
-            qDebug() << "Pulse" << pulseInfo->channelIndex << pulseInfo->cpuTemp << pulseInfo->pulseValue << pulseInfo->freq;
+            //qDebug() << "Pulse" << pulseInfo->channelIndex << pulseInfo->cpuTemp << pulseInfo->pulseValue << pulseInfo->freq;
             emit pulse(pulseInfo->channelIndex, pulseInfo->cpuTemp, pulseInfo->pulseValue, pulseInfo->gain);
         } else {
             qWarning() << "Bad datagram size actual:expected" << datagram.size() << expectedSize;

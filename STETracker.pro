@@ -1,4 +1,4 @@
-QT = core bluetooth quick svg xml gui
+QT = core bluetooth quick svg xml gui positioning
 
 HEADERS += \
     UDPLink.h \

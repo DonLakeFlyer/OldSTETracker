@@ -69,6 +69,8 @@ int main(int argc, char *argv[])
     UDPLink udpLink;
     Pulse pulse;
 
+    pulse.clearPulseTrajectory();
+
     udpLink.connect(&udpLink,   &UDPLink::pulse,        &pulse,     &Pulse::pulse);
     pulse.connect(&pulse,       &Pulse::setGainSignal,  &udpLink,   &UDPLink::setGain);
     pulse.connect(&pulse,       &Pulse::setFreqSignal,  &udpLink,   &UDPLink::setFreq);

@@ -5,6 +5,7 @@ import QtQuick.Window           2.11
 import Qt.labs.settings         1.0
 import QtQuick.Layouts          1.11
 import QtQuick.Controls.Styles  1.4
+import QtPositioning            5.11
 
 Window {
     id:     root
@@ -227,6 +228,69 @@ Window {
         }
     }
 
+    function updateHeading() {
+        headingAvailable = true
+        headingLowQuality = false
+
+        // Find strongest channel
+        var strongestChannel = -1
+        var strongestPulsePct = -1
+        var rgPulse = [ channel0PulsePercent, channel1PulsePercent, channel2PulsePercent, channel3PulsePercent ]
+        for (var index=0; index<rgPulse.length; index++) {
+            if (rgPulse[index] > strongestPulsePct) {
+                strongestChannel = index
+                strongestPulsePct = rgPulse[index]
+            }
+        }
+
+        if (strongestPulsePct == 0) {
+            // No antennas are picking up a signal
+            headingAvailable = false
+            headingLowQuality = true
+            return
+        }
+
+        var rgLeft = [ 3, 0, 1, 2 ]
+        var rgRight = [ 1, 2, 3, 0 ]
+        var rgHeading = [ 0.0, 90.0, 180.0, 270.0 ]
+        var strongLeft
+        var secondaryStrength
+        var leftPulse = rgPulse[rgLeft[strongestChannel]]
+        var rightPulse = rgPulse[rgRight[strongestChannel]]
+
+        // Start the the best simple single antenna estimate
+        newHeading = rgHeading[strongestChannel]
+
+        if (rightPulse == 0 && leftPulse == 0) {
+            // All we have is one antenna
+            headingLowQuality = true
+            return
+        }
+
+        // Take into acount left/right side strengths
+        var headingAdjust
+        if (rightPulse > leftPulse) {
+            if (leftPulse == 0) {
+                headingAdjust = rightPulse / strongestPulsePct
+            } else {
+                headingAdjust = (1 - (leftPulse / rightPulse)) / 0.5
+            }
+            newHeading += 45.0 * headingAdjust
+        } else {
+            if (rightPulse == 0) {
+                headingAdjust = leftPulse / strongestPulsePct
+            } else {
+                headingAdjust = (1 - (rightPulse / leftPulse)) / 0.5
+            }
+            newHeading -= 45.0 * headingAdjust
+        }
+        //console.log(qsTr("leftPulse(%1) centerPulse(%2) rightPulse(%3) headingAdjust(%4)").arg(leftPulse).arg(strongestPulsePct).arg(rightPulse).arg(headingAdjust))
+
+        newHeading = _normalizeHeading(newHeading)
+
+        //console.log("Estimated Heading:", heading)
+    }
+
     Connections {
         target: pulse
 
@@ -421,70 +485,22 @@ Window {
             console.log("tick", heading, newHeading, rotationAdjustedNewHeading, filteredHeading)
             filteredHeading = _normalizeHeading(filteredHeading)
             heading = filteredHeading
+            if (gpsPosition.position.latitudeValid && gpsPosition.position.longitudeValid) {
+                pulse.pulseTrajectory(gpsPosition.position.coordinate, gpsPosition.position.direction, heading)
+            }
         }
     }
 
-    function updateHeading() {
-        headingAvailable = true
-        headingLowQuality = false
+    PositionSource {
+        id:                             gpsPosition
+        active:                         true
+        updateInterval:                 500
+        preferredPositioningMethods:    PositionSource.SatellitePositioningMethods
 
-        // Find strongest channel
-        var strongestChannel = -1
-        var strongestPulsePct = -1
-        var rgPulse = [ channel0PulsePercent, channel1PulsePercent, channel2PulsePercent, channel3PulsePercent ]
-        for (var index=0; index<rgPulse.length; index++) {
-            if (rgPulse[index] > strongestPulsePct) {
-                strongestChannel = index
-                strongestPulsePct = rgPulse[index]
-            }
+        onPositionChanged: {
+            var coord = gpsPosition.position.coordinate;
+            console.log("Coordinate:", coord.longitude, coord.latitude);
         }
-
-        if (strongestPulsePct == 0) {
-            // No antennas are picking up a signal
-            headingAvailable = false
-            headingLowQuality = true
-            return
-        }
-
-        var rgLeft = [ 3, 0, 1, 2 ]
-        var rgRight = [ 1, 2, 3, 0 ]
-        var rgHeading = [ 0.0, 90.0, 180.0, 270.0 ]
-        var strongLeft
-        var secondaryStrength
-        var leftPulse = rgPulse[rgLeft[strongestChannel]]
-        var rightPulse = rgPulse[rgRight[strongestChannel]]
-
-        // Start the the best simple single antenna estimate
-        newHeading = rgHeading[strongestChannel]
-
-        if (rightPulse == 0 && leftPulse == 0) {
-            // All we have is one antenna
-            headingLowQuality = true
-            return
-        }
-
-        // Take into acount left/right side strengths
-        var headingAdjust
-        if (rightPulse > leftPulse) {
-            if (leftPulse == 0) {
-                headingAdjust = rightPulse / strongestPulsePct
-            } else {
-                headingAdjust = (1 - (leftPulse / rightPulse)) / 0.5
-            }
-            newHeading += 45.0 * headingAdjust
-        } else {
-            if (rightPulse == 0) {
-                headingAdjust = leftPulse / strongestPulsePct
-            } else {
-                headingAdjust = (1 - (rightPulse / leftPulse)) / 0.5
-            }
-            newHeading -= 45.0 * headingAdjust
-        }
-        //console.log(qsTr("leftPulse(%1) centerPulse(%2) rightPulse(%3) headingAdjust(%4)").arg(leftPulse).arg(strongestPulsePct).arg(rightPulse).arg(headingAdjust))
-
-        newHeading = _normalizeHeading(newHeading)
-
-        //console.log("Estimated Heading:", heading)
     }
 
     Text {

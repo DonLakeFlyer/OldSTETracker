@@ -67,9 +67,14 @@ int main(int argc, char *argv[])
     application.setApplicationName("VHF Collar Scanner");
 
     UDPLink udpLink;
-    Pulse pulse;
 
-    pulse.clearPulseTrajectory();
+#if 0
+    Pulse pulse(true /* captureRawData */);
+    pulse.clearFiles();
+#else
+    Pulse pulse(false /* captureRawData */);
+    pulse.startReplay();
+#endif
 
     udpLink.connect(&udpLink,   &UDPLink::pulse,        &pulse,     &Pulse::pulse);
     pulse.connect(&pulse,       &Pulse::setGainSignal,  &udpLink,   &UDPLink::setGain);

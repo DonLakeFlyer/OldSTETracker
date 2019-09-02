@@ -27,7 +27,7 @@ Window {
 
     property real pulseRange:           settings.maxRawPulse - settings.minRawPulse
     property int  gain:                 21
-    property real heading:              0
+    property real heading:              NaN
     property real newHeading:           0
     property bool headingAvailable:     false
     property bool headingLowQuality:    true
@@ -150,6 +150,8 @@ Window {
     }
 
     function _handlePulse(channelIndex, cpuTemp, pulseValue, gain) {
+        pulse.rawData(gpsPosition.position.coordinate.latitude, gpsPosition.position.coordinate.longitude, channelIndex, pulseValue)
+
         var pulsePercent
         if (pulseValue == 0) {
             pulsePercent = 0
@@ -466,10 +468,15 @@ Window {
     // This timer updates the heading value using a low pass filter
     Timer {
         running:    true
-        interval:   1000
+        interval:   500
         repeat:     true
 
         onTriggered: {
+            if (isNaN(heading)) {
+                heading = newHeading
+                return
+            }
+
             // If the differential in heading is > 180 degrees we need to make sure we adjust in the rotational
             // direction which is the shortest rotation distance
             var rotationAdjustedNewHeading = newHeading

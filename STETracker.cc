@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
 
     UDPLink udpLink;
 
-#if 0
+#if 1
     Pulse pulse(true /* captureRawData */);
     pulse.clearFiles();
 #else
